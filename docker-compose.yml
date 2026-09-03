@@ -98,6 +98,12 @@ services:
       DB_SCHEMA: "activity"
       DATABASE_URL: "postgres://dipstick:dipstick@postgres:5432/dipstick?sslmode=disable"
       VEHICLE_SERVICE_URL: "http://vehicle-service:8080"
+      # How long a vehicle lookup is cached before re-fetching. "0" disables it.
+      VEHICLE_CACHE_TTL: "30s"
+      # How often the background job deletes activity rows for vehicles that no
+      # longer exist in vehicle-service. Short here so it's easy to observe; "0"
+      # disables it. Production would use something like "1h".
+      RECONCILE_INTERVAL: "30s"
     ports:
       # API is on http://localhost:8082 from the host.
       - "8082:8080"
