@@ -1,0 +1,38 @@
+# --- Xcode / Swift (ios/) ---
+## User settings
+xcuserdata/
+*.xcuserstate
+
+## Build products
+build/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Swift Package Manager
+.swiftpm/
+Packages/
+Package.pins
+Package.resolved
+*.xcodeproj/project.xcworkspace/xcshareddata/
+
+## CocoaPods (only relevant if added later)
+Pods/
+
+# --- Go (backend/) ---
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# --- General ---
+.DS_Store
+.env
+.env.local
+*.log
