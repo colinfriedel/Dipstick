@@ -44,7 +44,15 @@ separate databases per service if you want to go further.
 
 ## 3. Database Schema (Postgres)
 
+Each service owns its own Postgres **schema** (namespace) in the shared instance:
+`vehicle` for vehicle-service, `activity` for activity-service. A service connects
+with `search_path` pointed at its own schema and never reads or writes the other's
+tables. The empty schemas are created by a one-time init script
+(`backend/db/init/`); the tables inside them are created by each service's
+own `golang-migrate` migrations.
+
 ```sql
+-- schema: vehicle  (owned by vehicle-service)
 CREATE TABLE vehicles (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
@@ -55,9 +63,10 @@ CREATE TABLE vehicles (
     current_odometer INT NOT NULL DEFAULT 0
 );
 
+-- schema: activity  (owned by activity-service)
 CREATE TABLE fuel_entries (
     id SERIAL PRIMARY KEY,
-    vehicle_id INT NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+    vehicle_id INT NOT NULL,       -- logical reference to vehicle.vehicles.id; NOT a DB foreign key
     date DATE NOT NULL,
     odometer INT NOT NULL,
     gallons NUMERIC(6,3) NOT NULL,
@@ -69,7 +78,7 @@ CREATE TABLE fuel_entries (
 
 CREATE TABLE maintenance_entries (
     id SERIAL PRIMARY KEY,
-    vehicle_id INT NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+    vehicle_id INT NOT NULL,       -- logical reference to vehicle.vehicles.id; NOT a DB foreign key
     date DATE NOT NULL,
     odometer INT NOT NULL,
     service_type TEXT NOT NULL,
@@ -80,6 +89,26 @@ CREATE TABLE maintenance_entries (
     next_due_date DATE
 );
 ```
+
+### 3.1 Why `vehicle_id` is not a foreign key
+
+`fuel_entries.vehicle_id` and `maintenance_entries.vehicle_id` are plain `INT`
+columns with **no `REFERENCES` constraint**. A real FK would force
+activity-service's tables to depend on vehicle-service's table living in the same
+database — exactly the coupling the two-service split is meant to avoid. Instead:
+
+- activity-service treats `vehicle_id` as an opaque identifier it stores and
+  echoes back.
+- When it needs to confirm a vehicle exists, or read its current odometer, it
+  calls **vehicle-service's HTTP API** (`GET /vehicles/{id}`), not the database.
+- Consequences we accept: the DB will not stop you inserting a fuel entry for a
+  non-existent vehicle (activity-service validates that itself via the API call),
+  and deleting a vehicle does **not** cascade-delete its activity rows (handled at
+  the application level in a later milestone — e.g. vehicle-service emits a
+  delete event, or activity-service cleans up lazily).
+
+This is the core microservices trade-off: we give up a database-enforced
+invariant to gain independently deployable, independently ownable services.
 
 ## 4. Key Logic (implemented in activity-service, Go)
 

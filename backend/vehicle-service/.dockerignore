@@ -1,0 +1,5 @@
+# Keep the build context small and deterministic. These never belong in the image.
+Dockerfile
+.dockerignore
+*.md
+migrations/

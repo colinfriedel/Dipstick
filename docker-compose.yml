@@ -1,0 +1,69 @@
+# Local development stack for Dipstick's backend.
+#
+# `docker compose up` starts three things in dependency order:
+#   1. postgres          - the database
+#   2. vehicle-migrate    - a one-shot container that applies SQL migrations, then exits
+#   3. vehicle-service    - the Go API, started only after migrations succeed
+#
+# Compose puts every service on a shared user-defined network and registers each
+# one under its service name as a DNS hostname. That's why the connection
+# strings below say `@postgres:5432` — inside this network, "postgres" resolves
+# to the database container. The host machine reaches things only through the
+# published `ports:` mappings.
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: dipstick
+      POSTGRES_PASSWORD: dipstick
+      POSTGRES_DB: dipstick
+    ports:
+      # host:container — connect from your Mac (psql, a GUI) on localhost:5432
+      - "5432:5432"
+    volumes:
+      # Named volume: the actual data files, so they survive `docker compose down`.
+      - postgres-data:/var/lib/postgresql/data
+      # Bind mount: our one-time schema setup, run on first init only.
+      - ./backend/db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # `condition: service_healthy` on other services waits for this to pass.
+      test: ["CMD-SHELL", "pg_isready -U dipstick -d dipstick"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  vehicle-migrate:
+    image: migrate/migrate:v4.18.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/vehicle-service/migrations:/migrations:ro
+    # search_path=vehicle => golang-migrate's own schema_migrations bookkeeping
+    # table, and anything the migrations create, land in the `vehicle` schema.
+    command:
+      [
+        "-path", "/migrations",
+        "-database", "postgres://dipstick:dipstick@postgres:5432/dipstick?sslmode=disable&search_path=vehicle",
+        "up",
+      ]
+
+  vehicle-service:
+    build: ./backend/vehicle-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vehicle-migrate:
+        # Wait for the migrate container to run to completion (exit 0).
+        condition: service_completed_successfully
+    environment:
+      PORT: "8080"
+      DB_SCHEMA: "vehicle"
+      DATABASE_URL: "postgres://dipstick:dipstick@postgres:5432/dipstick?sslmode=disable"
+    ports:
+      # API is on http://localhost:8081 from the host.
+      - "8081:8080"
+
+volumes:
+  postgres-data:
