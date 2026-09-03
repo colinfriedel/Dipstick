@@ -1,66 +1,80 @@
 import SwiftUI
 
-/// Shows one vehicle's details, with Edit and Delete. The Fuel / Maintenance /
-/// Stats tabs the spec calls for arrive in Milestone 6 (they need activity-service).
+/// One vehicle's screen: a compact header, then a Fuel / Maintenance / Stats
+/// segmented view. Edit and Delete live in the toolbar menu.
 struct VehicleDetailView: View {
+    enum Tab: String, CaseIterable {
+        case fuel = "Fuel"
+        case maintenance = "Maintenance"
+        case stats = "Stats"
+    }
+
     @State private var vehicle: Vehicle
+    @State private var tab: Tab = .fuel
+    @State private var fuelViewModel: FuelLogViewModel
+    @State private var maintenanceViewModel: MaintenanceLogViewModel
+
     @State private var showingEditForm = false
     @State private var confirmingDelete = false
     @State private var deleteError: String?
 
     @Environment(\.dismiss) private var dismiss
 
-    /// Called after an edit or delete, so the list can refresh.
+    /// Called after an edit or delete so the list can refresh.
     let onChange: () -> Void
-    private let repository: any VehicleRepository
+    private let vehicleRepository: any VehicleRepository
 
     init(
         vehicle: Vehicle,
-        repository: (any VehicleRepository)? = nil,
+        vehicleRepository: (any VehicleRepository)? = nil,
+        activityRepository: (any ActivityRepository)? = nil,
         onChange: @escaping () -> Void
     ) {
         _vehicle = State(initialValue: vehicle)
-        self.repository = repository ?? AppEnvironment.vehicleRepository
+        _fuelViewModel = State(initialValue: FuelLogViewModel(vehicleID: vehicle.id, repository: activityRepository))
+        _maintenanceViewModel = State(initialValue: MaintenanceLogViewModel(vehicleID: vehicle.id, repository: activityRepository))
+        self.vehicleRepository = vehicleRepository ?? AppEnvironment.vehicleRepository
         self.onChange = onChange
     }
 
     var body: some View {
-        List {
-            Section("Details") {
-                LabeledContent("Name", value: vehicle.name)
-                if let year = vehicle.year {
-                    LabeledContent("Year", value: String(year))
-                }
-                if let make = vehicle.make, !make.isEmpty {
-                    LabeledContent("Make", value: make)
-                }
-                if let model = vehicle.model, !model.isEmpty {
-                    LabeledContent("Model", value: model)
-                }
-                if let vin = vehicle.vin, !vin.isEmpty {
-                    LabeledContent("VIN", value: vin)
-                }
-                LabeledContent("Odometer", value: "\(vehicle.currentOdometer.formatted()) mi")
-            }
+        VStack(spacing: 0) {
+            header
 
-            Section {
-                Label("Fuel and maintenance logs arrive in the next milestone.",
-                      systemImage: "hourglass")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            Picker("View", selection: $tab) {
+                ForEach(Tab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.bottom, 8)
 
-            Section {
-                Button("Delete Vehicle", role: .destructive) {
-                    confirmingDelete = true
-                }
+            Divider()
+
+            switch tab {
+            case .fuel:
+                FuelLogView(viewModel: fuelViewModel)
+            case .maintenance:
+                MaintenanceLogView(viewModel: maintenanceViewModel)
+            case .stats:
+                VehicleStatsView(fuelViewModel: fuelViewModel)
             }
         }
         .navigationTitle(vehicle.name)
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await fuelViewModel.load()
+            await maintenanceViewModel.load()
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Edit") { showingEditForm = true }
+                Menu {
+                    Button("Edit Details", systemImage: "pencil") { showingEditForm = true }
+                    Button("Delete Vehicle", systemImage: "trash", role: .destructive) {
+                        confirmingDelete = true
+                    }
+                } label: {
+                    Label("More", systemImage: "ellipsis.circle")
+                }
             }
         }
         .sheet(isPresented: $showingEditForm) {
@@ -93,9 +107,24 @@ struct VehicleDetailView: View {
         }
     }
 
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if !vehicle.descriptiveTitle.isEmpty {
+                Text(vehicle.descriptiveTitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Text("\(vehicle.currentOdometer.formatted()) mi")
+                .font(.title3.weight(.semibold))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+    }
+
     private func performDelete() async {
         do {
-            try await repository.delete(id: vehicle.id)
+            try await vehicleRepository.delete(id: vehicle.id)
             onChange()
             dismiss()
         } catch {
@@ -106,7 +135,10 @@ struct VehicleDetailView: View {
 
 #Preview {
     NavigationStack {
-        VehicleDetailView(vehicle: InMemoryVehicleRepository.sample[1],
-                          repository: InMemoryVehicleRepository()) {}
+        VehicleDetailView(
+            vehicle: InMemoryVehicleRepository.sample[0],
+            vehicleRepository: InMemoryVehicleRepository(),
+            activityRepository: InMemoryActivityRepository()
+        ) {}
     }
 }

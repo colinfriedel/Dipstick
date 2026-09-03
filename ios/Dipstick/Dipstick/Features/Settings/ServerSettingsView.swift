@@ -1,38 +1,48 @@
 import SwiftUI
 
-/// Lets you point the app at a different backend without rebuilding — the local
-/// Docker stack while developing, the deployed server otherwise.
+/// Point the app at a different backend without rebuilding — the local Docker
+/// stack while developing, a deployed server otherwise. Both services are
+/// configured separately since they may live on different hosts once deployed.
 ///
-/// Saving writes to `@AppStorage` (UserDefaults). `DipstickApp` keys the whole
-/// view tree off this value, so a change reloads every screen against the new URL.
+/// Saving writes `@AppStorage` (UserDefaults); `DipstickApp` keys the view tree
+/// off these values, so a change reloads every screen against the new URLs.
 struct ServerSettingsView: View {
-    @AppStorage(AppEnvironment.backendOverrideKey) private var override = ""
+    @AppStorage(AppEnvironment.vehicleOverrideKey) private var vehicleOverride = ""
+    @AppStorage(AppEnvironment.activityOverrideKey) private var activityOverride = ""
     @Environment(\.dismiss) private var dismiss
 
-    @State private var draft = ""
+    @State private var vehicleDraft = ""
+    @State private var activityDraft = ""
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("http://your-mac.local:8081", text: $draft)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                    TextField(AppEnvironment.defaultVehicleURLString, text: $vehicleDraft)
+                        .modifier(URLFieldStyle())
                 } header: {
-                    Text("Backend URL")
-                } footer: {
-                    Text("Leave blank to use the built-in default:\n\(AppEnvironment.defaultBackendURLString)\n\nChanging this reloads the app.")
+                    Text("Vehicle service")
                 }
 
                 Section {
-                    LabeledContent("Currently using", value: AppEnvironment.vehicleServiceURL.absoluteString)
-                        .font(.footnote)
+                    TextField(AppEnvironment.defaultActivityURLString, text: $activityDraft)
+                        .modifier(URLFieldStyle())
+                } header: {
+                    Text("Activity service (fuel, maintenance)")
+                } footer: {
+                    Text("Leave a field blank to use its built-in default. Changing either reloads the app.")
                 }
 
-                if !override.isEmpty {
-                    Button("Reset to default", role: .destructive) {
-                        override = ""
+                Section("Currently using") {
+                    LabeledContent("Vehicle", value: AppEnvironment.vehicleServiceURL.absoluteString)
+                    LabeledContent("Activity", value: AppEnvironment.activityServiceURL.absoluteString)
+                }
+                .font(.footnote)
+
+                if !vehicleOverride.isEmpty || !activityOverride.isEmpty {
+                    Button("Reset both to defaults", role: .destructive) {
+                        vehicleOverride = ""
+                        activityOverride = ""
                         dismiss()
                     }
                 }
@@ -45,13 +55,26 @@ struct ServerSettingsView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        override = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+                        vehicleOverride = vehicleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                        activityOverride = activityDraft.trimmingCharacters(in: .whitespacesAndNewlines)
                         dismiss()
                     }
                 }
             }
-            .onAppear { draft = override }
+            .onAppear {
+                vehicleDraft = vehicleOverride
+                activityDraft = activityOverride
+            }
         }
+    }
+}
+
+private struct URLFieldStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .keyboardType(.URL)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
     }
 }
 
