@@ -70,6 +70,7 @@ to ship this app" — that trade-off is intentional.
 - Exporting to CSV/PDF.
 - Offline mode / local caching on the client.
 - Android/other platforms.
+- Notification when parked at a gas station (detected refuel)
 - **Automatic city/highway driving split per tank** (see 5.1 below) — noted for v2,
   not part of MVP.
 
