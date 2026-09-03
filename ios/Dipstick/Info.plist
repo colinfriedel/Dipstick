@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  App Transport Security.
+
+	  This app talks to a self-hosted backend whose address the user configures
+	  (Settings > Server): the local Docker stack over plain HTTP during
+	  development (a Mac's .local name or a LAN IP), or the deployed server over
+	  HTTPS otherwise. Because a LAN IP over HTTP is otherwise blocked by ATS, we
+	  allow arbitrary loads. The deployed backend uses HTTPS regardless.
+
+	  Xcode still generates the rest of Info.plist (GENERATE_INFOPLIST_FILE = YES)
+	  and merges these keys on top.
+	-->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>
