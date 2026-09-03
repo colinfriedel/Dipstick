@@ -57,8 +57,26 @@ func (d Date) toTime() time.Time {
 func (d Date) Before(other Date) bool { return d.toTime().Before(other.toTime()) }
 func (d Date) Equal(other Date) bool  { return d == other }
 
-// MarshalJSON renders the date as a quoted "YYYY-MM-DD" string.
+// DaysUntil returns the whole days from d to other: positive if other is later,
+// negative if earlier. Both sides are UTC midnight, so the difference is an
+// exact multiple of 24h and DST never enters into it.
+func (d Date) DaysUntil(other Date) int {
+	return int(other.toTime().Sub(d.toTime()).Hours()) / 24
+}
+
+// Today is the current calendar date in the server's local timezone (UTC in the
+// container unless TZ is set). Good enough for due-date buffers measured in days.
+func Today() Date {
+	return DateOf(time.Now())
+}
+
+// MarshalJSON renders the date as a quoted "YYYY-MM-DD" string, or null when the
+// Date is the zero value. Treating zero as null lets an optional date field
+// (e.g. a maintenance entry's nextDueDate) be a plain Date rather than a *Date.
 func (d Date) MarshalJSON() ([]byte, error) {
+	if d.IsZero() {
+		return []byte("null"), nil
+	}
 	return []byte(`"` + d.String() + `"`), nil
 }
 
@@ -66,6 +84,7 @@ func (d Date) MarshalJSON() ([]byte, error) {
 func (d *Date) UnmarshalJSON(data []byte) error {
 	s := strings.Trim(string(data), `"`)
 	if s == "" || s == "null" {
+		*d = Date{}
 		return nil
 	}
 	parsed, err := ParseDate(s)
@@ -76,9 +95,13 @@ func (d *Date) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Value implements driver.Valuer: how a Date is handed to the DB driver. We send
-// a time.Time; the pgx driver writes it to a DATE column.
+// Value implements driver.Valuer: how a Date is handed to the DB driver. A zero
+// Date becomes SQL NULL; otherwise we send a time.Time and pgx writes it to the
+// DATE column.
 func (d Date) Value() (driver.Value, error) {
+	if d.IsZero() {
+		return nil, nil
+	}
 	return d.toTime(), nil
 }
 
@@ -88,6 +111,7 @@ func (d Date) Value() (driver.Value, error) {
 func (d *Date) Scan(src any) error {
 	switch v := src.(type) {
 	case nil:
+		*d = Date{}
 		return nil
 	case time.Time:
 		*d = DateOf(v)

@@ -2,8 +2,9 @@
 // now that's just vehicle-service, reached over HTTP.
 //
 // The architecture doc's core microservices lesson: activity-service does NOT
-// read the vehicles table. When it needs to know a vehicle exists (or, later,
-// its current odometer), it asks vehicle-service's API.
+// read the vehicles table. When it needs to know a vehicle exists, or needs the
+// fleet's current odometers for the /due calculation, it asks vehicle-service's
+// API.
 package client
 
 import (
@@ -16,15 +17,20 @@ import (
 	"time"
 )
 
-// Sentinel errors so callers can react differently to "the vehicle genuinely
-// isn't there" versus "we couldn't reach the service to find out".
+// Sentinel errors so callers can tell "the vehicle genuinely isn't there" from
+// "we couldn't reach the service to find out".
 var (
 	// ErrVehicleNotFound means vehicle-service answered 404 — a definitive "no".
 	ErrVehicleNotFound = errors.New("client: vehicle not found")
 	// ErrVehicleServiceUnavailable means we couldn't get a usable answer:
-	// timeout, connection refused, or a 5xx. The caller should treat this as
-	// "try again later", not "the vehicle doesn't exist".
+	// timeout, connection refused, or a 5xx. Treat it as "try again later".
 	ErrVehicleServiceUnavailable = errors.New("client: vehicle-service unavailable")
+)
+
+const (
+	requestTimeout = 3 * time.Second
+	retryBackoff   = 200 * time.Millisecond
+	maxAttempts    = 2
 )
 
 // Vehicle is the subset of vehicle-service's response this service uses.
@@ -49,69 +55,82 @@ type VehicleClient struct {
 func NewVehicleClient(baseURL string) *VehicleClient {
 	return &VehicleClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
-		http:    &http.Client{Timeout: 3 * time.Second},
+		http:    &http.Client{Timeout: requestTimeout},
 	}
 }
 
-// GetVehicle fetches one vehicle by id.
-//
-// Retry policy: one extra attempt on a transient failure (network error or 5xx),
-// with a short fixed backoff. A 404 is definitive and never retried. The retry
-// is capped hard so a struggling upstream adds at most ~200ms of latency here.
+// GetVehicle fetches one vehicle by id. Returns ErrVehicleNotFound (404) or
+// ErrVehicleServiceUnavailable (couldn't reach it).
 func (c *VehicleClient) GetVehicle(ctx context.Context, id int64) (Vehicle, error) {
-	url := fmt.Sprintf("%s/vehicles/%d", c.baseURL, id)
+	var vehicle Vehicle
+	if err := c.getJSON(ctx, fmt.Sprintf("/vehicles/%d", id), &vehicle); err != nil {
+		return Vehicle{}, err
+	}
+	return vehicle, nil
+}
 
-	const maxAttempts = 2
+// ListVehicles fetches every vehicle. Used by the /due calculation to get each
+// vehicle's current odometer. Returns ErrVehicleServiceUnavailable if it can't
+// reach the service.
+func (c *VehicleClient) ListVehicles(ctx context.Context) ([]Vehicle, error) {
+	var vehicles []Vehicle
+	if err := c.getJSON(ctx, "/vehicles", &vehicles); err != nil {
+		return nil, err
+	}
+	return vehicles, nil
+}
+
+// getJSON does a GET, decodes a 200 body into dest, and applies the retry
+// policy: one extra attempt on a transient failure (network error or 5xx) with a
+// short fixed backoff. A 404 is definitive and never retried.
+func (c *VehicleClient) getJSON(ctx context.Context, path string, dest any) error {
+	url := c.baseURL + path
+
 	var lastErr error
-
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		vehicle, err := c.getVehicleOnce(ctx, url)
+		status, err := c.getOnce(ctx, url, dest)
 		if err == nil {
-			return vehicle, nil
+			return nil
 		}
-		if errors.Is(err, ErrVehicleNotFound) {
-			return Vehicle{}, err
+		if status == http.StatusNotFound {
+			return ErrVehicleNotFound
 		}
 
 		lastErr = err
 		if attempt < maxAttempts {
 			select {
-			case <-time.After(200 * time.Millisecond):
+			case <-time.After(retryBackoff):
 			case <-ctx.Done():
-				return Vehicle{}, ctx.Err()
+				return ctx.Err()
 			}
 		}
 	}
 
 	// Wrap so callers can errors.Is(err, ErrVehicleServiceUnavailable) while the
-	// underlying cause is still visible in logs.
-	return Vehicle{}, fmt.Errorf("%w: %v", ErrVehicleServiceUnavailable, lastErr)
+	// underlying cause stays visible in logs.
+	return fmt.Errorf("%w: %v", ErrVehicleServiceUnavailable, lastErr)
 }
 
-func (c *VehicleClient) getVehicleOnce(ctx context.Context, url string) (Vehicle, error) {
+// getOnce performs a single request. It returns the HTTP status code (0 if the
+// request never completed) alongside any error, so getJSON can special-case 404.
+func (c *VehicleClient) getOnce(ctx context.Context, url string, dest any) (int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return Vehicle{}, err
+		return 0, err
 	}
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return Vehicle{}, err // network-level failure: transient
+		return 0, err // network-level failure: transient
 	}
 	defer resp.Body.Close()
 
-	switch {
-	case resp.StatusCode == http.StatusOK:
-		var vehicle Vehicle
-		if err := json.NewDecoder(resp.Body).Decode(&vehicle); err != nil {
-			return Vehicle{}, fmt.Errorf("decoding vehicle response: %w", err)
-		}
-		return vehicle, nil
-
-	case resp.StatusCode == http.StatusNotFound:
-		return Vehicle{}, ErrVehicleNotFound
-
-	default:
-		return Vehicle{}, fmt.Errorf("vehicle-service returned status %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		return resp.StatusCode, fmt.Errorf("vehicle-service returned status %d", resp.StatusCode)
 	}
+
+	if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
+		return resp.StatusCode, fmt.Errorf("decoding vehicle-service response: %w", err)
+	}
+	return resp.StatusCode, nil
 }

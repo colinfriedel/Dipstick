@@ -17,7 +17,7 @@ import (
 // on vehicle-service (via VehicleValidator).
 type FuelHandler struct {
 	store    FuelStore
-	vehicles VehicleValidator
+	vehicles VehicleAPI
 }
 
 // List handles GET /vehicles/{id}/fuel-entries.
