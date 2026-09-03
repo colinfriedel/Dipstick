@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  iOS blocks plain-HTTP (cleartext) network requests by default (App Transport
+	  Security). Our local dev backend runs on http://localhost:8081, so we add a
+	  narrow exception for localhost only. In production the app talks to the
+	  backend over HTTPS and none of this applies.
+
+	  Xcode still generates the rest of Info.plist (GENERATE_INFOPLIST_FILE = YES)
+	  and merges these keys on top.
+	-->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>

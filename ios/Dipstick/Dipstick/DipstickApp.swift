@@ -2,8 +2,6 @@
 //  DipstickApp.swift
 //  Dipstick
 //
-//  Created by Colin Friedel on 9/3/26.
-//
 
 import SwiftUI
 
@@ -11,7 +9,7 @@ import SwiftUI
 struct DipstickApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            VehicleListView()
         }
     }
 }
