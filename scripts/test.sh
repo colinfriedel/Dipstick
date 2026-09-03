@@ -15,6 +15,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # As more services are added, list their directories here.
 SERVICES=(
   "backend/vehicle-service"
+  "backend/activity-service"
 )
 
 for service in "${SERVICES[@]}"; do

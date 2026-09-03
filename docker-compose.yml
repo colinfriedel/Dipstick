@@ -1,15 +1,17 @@
 # Local development stack for Dipstick's backend.
 #
-# `docker compose up` starts three things in dependency order:
-#   1. postgres          - the database
-#   2. vehicle-migrate    - a one-shot container that applies SQL migrations, then exits
-#   3. vehicle-service    - the Go API, started only after migrations succeed
+# `docker compose up` starts, in dependency order:
+#   1. postgres           - the database
+#   2. vehicle-migrate     - one-shot: applies vehicle-service migrations, then exits
+#   3. vehicle-service     - the Vehicle CRUD API
+#   4. activity-migrate    - one-shot: applies activity-service migrations, then exits
+#   5. activity-service    - the fuel/maintenance API; calls vehicle-service over HTTP
 #
 # Compose puts every service on a shared user-defined network and registers each
 # one under its service name as a DNS hostname. That's why the connection
-# strings below say `@postgres:5432` — inside this network, "postgres" resolves
-# to the database container. The host machine reaches things only through the
-# published `ports:` mappings.
+# strings below say `@postgres:5432` and `http://vehicle-service:8080` — inside
+# this network, those names resolve to the right containers. The host machine
+# reaches things only through the published `ports:` mappings.
 
 services:
   postgres:
@@ -64,6 +66,41 @@ services:
     ports:
       # API is on http://localhost:8081 from the host.
       - "8081:8080"
+
+  activity-migrate:
+    image: migrate/migrate:v4.18.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/activity-service/migrations:/migrations:ro
+    command:
+      [
+        "-path", "/migrations",
+        "-database", "postgres://dipstick:dipstick@postgres:5432/dipstick?sslmode=disable&search_path=activity",
+        "up",
+      ]
+
+  activity-service:
+    build: ./backend/activity-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      activity-migrate:
+        condition: service_completed_successfully
+      # We wait for vehicle-service's container to *start* so the hostname
+      # resolves, but not for it to be "healthy" — activity-service handles
+      # vehicle-service being unready at request time (503 on create).
+      vehicle-service:
+        condition: service_started
+    environment:
+      PORT: "8080"
+      DB_SCHEMA: "activity"
+      DATABASE_URL: "postgres://dipstick:dipstick@postgres:5432/dipstick?sslmode=disable"
+      VEHICLE_SERVICE_URL: "http://vehicle-service:8080"
+    ports:
+      # API is on http://localhost:8082 from the host.
+      - "8082:8080"
 
 volumes:
   postgres-data:

@@ -6,12 +6,13 @@
 # Postgres must already be running (./scripts/run-local.sh -d, or just the db:
 # `docker compose up -d postgres`).
 #
-# Usage:
-#   ./scripts/migrate.sh vehicle up              # apply all pending migrations
-#   ./scripts/migrate.sh vehicle down 1          # roll back the last migration
-#   ./scripts/migrate.sh vehicle version         # print current version
-#   ./scripts/migrate.sh vehicle force 1         # reset a "dirty" state to v1
-#   ./scripts/migrate.sh vehicle create add_foo  # scaffold a new migration pair
+# Usage (service is "vehicle" or "activity"):
+#   ./scripts/migrate.sh vehicle  up             # apply all pending migrations
+#   ./scripts/migrate.sh activity up
+#   ./scripts/migrate.sh vehicle  down 1         # roll back the last migration
+#   ./scripts/migrate.sh vehicle  version        # print current version
+#   ./scripts/migrate.sh vehicle  force 1        # reset a "dirty" state to v1
+#   ./scripts/migrate.sh activity create add_foo # scaffold a new migration pair
 
 set -euo pipefail
 
@@ -19,7 +20,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ $# -lt 2 ]]; then
   echo "usage: $0 <service> <migrate-command> [args...]" >&2
-  echo "  service: vehicle" >&2
+  echo "  service: vehicle | activity" >&2
   exit 1
 fi
 
