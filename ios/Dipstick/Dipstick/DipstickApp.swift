@@ -7,15 +7,16 @@ import SwiftUI
 
 @main
 struct DipstickApp: App {
-    /// When the backend URL changes we key the whole view tree off it, so every
-    /// screen (and its view model, and its repository) is rebuilt against the
-    /// new server.
-    @AppStorage(AppEnvironment.backendOverrideKey) private var backendOverride = ""
+    /// Any change to a backend URL bumps these, which changes the root view's
+    /// id, which rebuilds the whole tree (and every view model + repository)
+    /// against the new servers — no relaunch needed.
+    @AppStorage(AppEnvironment.vehicleOverrideKey) private var vehicleOverride = ""
+    @AppStorage(AppEnvironment.activityOverrideKey) private var activityOverride = ""
 
     var body: some Scene {
         WindowGroup {
             VehicleListView()
-                .id(backendOverride)
+                .id("\(vehicleOverride)|\(activityOverride)")
         }
     }
 }
