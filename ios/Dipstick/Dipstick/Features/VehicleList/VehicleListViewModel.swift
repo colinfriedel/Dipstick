@@ -14,8 +14,8 @@ final class VehicleListViewModel {
 
     private let repository: any VehicleRepository
 
-    init(repository: any VehicleRepository = AppEnvironment.vehicleRepository) {
-        self.repository = repository
+    init(repository: (any VehicleRepository)? = nil) {
+        self.repository = repository ?? AppEnvironment.vehicleRepository
     }
 
     func load() async {

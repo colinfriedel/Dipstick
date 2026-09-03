@@ -31,9 +31,9 @@ final class VehicleFormViewModel {
     private let mode: VehicleFormMode
     private let repository: any VehicleRepository
 
-    init(mode: VehicleFormMode, repository: any VehicleRepository = AppEnvironment.vehicleRepository) {
+    init(mode: VehicleFormMode, repository: (any VehicleRepository)? = nil) {
         self.mode = mode
-        self.repository = repository
+        self.repository = repository ?? AppEnvironment.vehicleRepository
 
         if case .edit(let vehicle) = mode {
             name = vehicle.name

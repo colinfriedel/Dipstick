@@ -4,6 +4,7 @@ import SwiftUI
 struct VehicleListView: View {
     @State private var viewModel: VehicleListViewModel
     @State private var showingAddForm = false
+    @State private var showingServerSettings = false
 
     init(viewModel: VehicleListViewModel? = nil) {
         _viewModel = State(initialValue: viewModel ?? VehicleListViewModel())
@@ -26,11 +27,21 @@ struct VehicleListView: View {
                             Label("Add Vehicle", systemImage: "plus")
                         }
                     }
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            showingServerSettings = true
+                        } label: {
+                            Label("Server", systemImage: "gearshape")
+                        }
+                    }
                 }
                 .sheet(isPresented: $showingAddForm) {
                     VehicleFormView(mode: .create) { _ in
                         Task { await viewModel.load() }
                     }
+                }
+                .sheet(isPresented: $showingServerSettings) {
+                    ServerSettingsView()
                 }
                 .task { await viewModel.load() }
                 .refreshable { await viewModel.load() }
