@@ -11,11 +11,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/colinfriedel/dipstick/activity-service/client"
 	"github.com/colinfriedel/dipstick/activity-service/handlers"
+	"github.com/colinfriedel/dipstick/activity-service/service"
 	"github.com/colinfriedel/dipstick/activity-service/store"
 )
 
@@ -40,6 +42,11 @@ func run() error {
 		return errors.New("VEHICLE_SERVICE_URL is required")
 	}
 
+	// The "due soon" buffers are tunable per the spec; default to 500 mi / 14 days.
+	dueConfig := service.DefaultDueConfig()
+	dueConfig.MilesBuffer = getenvInt("DUE_MILES_BUFFER", dueConfig.MilesBuffer)
+	dueConfig.DaysBuffer = getenvInt("DUE_DAYS_BUFFER", dueConfig.DaysBuffer)
+
 	// --- Dependencies ---
 	st, err := store.New(databaseURL, schema)
 	if err != nil {
@@ -57,11 +64,17 @@ func run() error {
 
 	vehicleClient := client.NewVehicleClient(vehicleServiceURL)
 	log.Printf("vehicle-service base URL: %s", vehicleServiceURL)
+	log.Printf("due buffers: %d miles, %d days", dueConfig.MilesBuffer, dueConfig.DaysBuffer)
 
 	// --- HTTP server ---
 	server := &http.Server{
-		Addr:         ":" + port,
-		Handler:      handlers.NewRouter(st, vehicleClient),
+		Addr: ":" + port,
+		Handler: handlers.NewRouter(handlers.Deps{
+			Fuel:        st,
+			Maintenance: st,
+			Vehicles:    vehicleClient,
+			DueConfig:   dueConfig,
+		}),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -111,4 +124,19 @@ func getenv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// getenvInt reads an integer environment variable, falling back to the default
+// when unset or unparseable.
+func getenvInt(key string, fallback int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		log.Printf("ignoring %s=%q: not an integer", key, value)
+		return fallback
+	}
+	return parsed
 }

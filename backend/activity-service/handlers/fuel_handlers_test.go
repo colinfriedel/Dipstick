@@ -42,22 +42,32 @@ func (f *fakeFuelStore) CreateFuelEntry(ctx context.Context, vehicleID int64, in
 	return e, nil
 }
 
-type fakeVehicleValidator struct {
-	err error
+type fakeVehicleAPI struct {
+	err  error
+	list []client.Vehicle
 }
 
-func (f *fakeVehicleValidator) GetVehicle(ctx context.Context, id int64) (client.Vehicle, error) {
+func (f *fakeVehicleAPI) GetVehicle(ctx context.Context, id int64) (client.Vehicle, error) {
 	if f.err != nil {
 		return client.Vehicle{}, f.err
 	}
 	return client.Vehicle{ID: id, Name: "Test Car", CurrentOdometer: 50000}, nil
 }
 
-func doRequest(t *testing.T, store FuelStore, vehicles VehicleValidator, method, path, body string) *httptest.ResponseRecorder {
+func (f *fakeVehicleAPI) ListVehicles(ctx context.Context) ([]client.Vehicle, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.list, nil
+}
+
+// doRequest runs one request through the real router. Only the fuel handlers
+// need a store here, so maintenance is left nil.
+func doRequest(t *testing.T, store FuelStore, vehicles VehicleAPI, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	rec := httptest.NewRecorder()
-	NewRouter(store, vehicles).ServeHTTP(rec, req)
+	NewRouter(Deps{Fuel: store, Vehicles: vehicles}).ServeHTTP(rec, req)
 	return rec
 }
 
@@ -65,7 +75,7 @@ func doRequest(t *testing.T, store FuelStore, vehicles VehicleValidator, method,
 
 func TestCreateFuelEntry_Valid(t *testing.T) {
 	store := &fakeFuelStore{}
-	vehicles := &fakeVehicleValidator{}
+	vehicles := &fakeVehicleAPI{}
 
 	body := `{"date":"2024-03-14","odometer":42000,"gallons":10.5,"totalCost":38.25,"isFullTank":true}`
 	rec := doRequest(t, store, vehicles, http.MethodPost, "/vehicles/7/fuel-entries", body)
@@ -95,7 +105,7 @@ func TestCreateFuelEntry_Valid(t *testing.T) {
 func TestCreateFuelEntry_DerivesTotalCostFromPricePerGallon(t *testing.T) {
 	store := &fakeFuelStore{}
 	body := `{"date":"2024-03-14","odometer":42000,"gallons":10,"pricePerGallon":3.50}`
-	rec := doRequest(t, store, &fakeVehicleValidator{}, http.MethodPost, "/vehicles/1/fuel-entries", body)
+	rec := doRequest(t, store, &fakeVehicleAPI{}, http.MethodPost, "/vehicles/1/fuel-entries", body)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201 (body: %s)", rec.Code, rec.Body)
@@ -108,7 +118,7 @@ func TestCreateFuelEntry_DerivesTotalCostFromPricePerGallon(t *testing.T) {
 func TestCreateFuelEntry_DefaultsIsFullTankToTrue(t *testing.T) {
 	store := &fakeFuelStore{}
 	body := `{"date":"2024-03-14","odometer":42000,"gallons":10,"totalCost":30}`
-	rec := doRequest(t, store, &fakeVehicleValidator{}, http.MethodPost, "/vehicles/1/fuel-entries", body)
+	rec := doRequest(t, store, &fakeVehicleAPI{}, http.MethodPost, "/vehicles/1/fuel-entries", body)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201", rec.Code)
@@ -119,7 +129,7 @@ func TestCreateFuelEntry_DefaultsIsFullTankToTrue(t *testing.T) {
 }
 
 func TestCreateFuelEntry_MissingCost(t *testing.T) {
-	rec := doRequest(t, &fakeFuelStore{}, &fakeVehicleValidator{}, http.MethodPost,
+	rec := doRequest(t, &fakeFuelStore{}, &fakeVehicleAPI{}, http.MethodPost,
 		"/vehicles/1/fuel-entries", `{"date":"2024-03-14","odometer":42000,"gallons":10}`)
 
 	if rec.Code != http.StatusUnprocessableEntity {
@@ -128,7 +138,7 @@ func TestCreateFuelEntry_MissingCost(t *testing.T) {
 }
 
 func TestCreateFuelEntry_BadDate(t *testing.T) {
-	rec := doRequest(t, &fakeFuelStore{}, &fakeVehicleValidator{}, http.MethodPost,
+	rec := doRequest(t, &fakeFuelStore{}, &fakeVehicleAPI{}, http.MethodPost,
 		"/vehicles/1/fuel-entries", `{"date":"March 14","odometer":42000,"gallons":10,"totalCost":30}`)
 
 	if rec.Code != http.StatusBadRequest {
@@ -137,7 +147,7 @@ func TestCreateFuelEntry_BadDate(t *testing.T) {
 }
 
 func TestCreateFuelEntry_VehicleNotFound(t *testing.T) {
-	vehicles := &fakeVehicleValidator{err: client.ErrVehicleNotFound}
+	vehicles := &fakeVehicleAPI{err: client.ErrVehicleNotFound}
 	rec := doRequest(t, &fakeFuelStore{}, vehicles, http.MethodPost,
 		"/vehicles/999/fuel-entries", `{"date":"2024-03-14","odometer":42000,"gallons":10,"totalCost":30}`)
 
@@ -147,7 +157,7 @@ func TestCreateFuelEntry_VehicleNotFound(t *testing.T) {
 }
 
 func TestCreateFuelEntry_VehicleServiceUnavailable(t *testing.T) {
-	vehicles := &fakeVehicleValidator{err: client.ErrVehicleServiceUnavailable}
+	vehicles := &fakeVehicleAPI{err: client.ErrVehicleServiceUnavailable}
 	store := &fakeFuelStore{}
 	rec := doRequest(t, store, vehicles, http.MethodPost,
 		"/vehicles/7/fuel-entries", `{"date":"2024-03-14","odometer":42000,"gallons":10,"totalCost":30}`)
@@ -171,7 +181,7 @@ func TestListFuelEntries_ComputesMPG(t *testing.T) {
 			Date: models.Date{Year: 2024, Month: 1, Day: 1}},
 	}}
 
-	rec := doRequest(t, store, &fakeVehicleValidator{}, http.MethodGet, "/vehicles/1/fuel-entries", "")
+	rec := doRequest(t, store, &fakeVehicleAPI{}, http.MethodGet, "/vehicles/1/fuel-entries", "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -197,7 +207,7 @@ func TestListFuelEntries_ComputesMPG(t *testing.T) {
 }
 
 func TestListFuelEntries_EmptyIsJSONArray(t *testing.T) {
-	rec := doRequest(t, &fakeFuelStore{entries: []models.FuelEntry{}}, &fakeVehicleValidator{},
+	rec := doRequest(t, &fakeFuelStore{entries: []models.FuelEntry{}}, &fakeVehicleAPI{},
 		http.MethodGet, "/vehicles/1/fuel-entries", "")
 
 	if got := strings.TrimSpace(rec.Body.String()); got != "[]" {
