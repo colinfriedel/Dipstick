@@ -52,6 +52,9 @@ run it on a device, use the app's **Settings › Server** to point it at your Ma
 - **backend.yml** — on every PR and push to `main`: `gofmt`, `go vet`,
   `golangci-lint`, `go test -race` for both services. On push to `main` it also
   builds and pushes images to `ghcr.io/colinfriedel/dipstick-{vehicle,activity}-service`.
-- **ios.yml** — on iOS changes: `xcodebuild test` (unit tests) on a macOS runner.
+- **ios.yml** — on iOS changes: `xcodebuild build-for-testing` on a macOS runner
+  (compiles the app + both test bundles). Running the tests in CI needs a
+  downloaded simulator runtime — a later refinement; they run locally and in
+  `scripts/check.sh`-adjacent workflows.
 
 Deployment (DNS, HTTPS, a running host) is a later milestone.
