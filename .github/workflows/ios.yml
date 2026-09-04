@@ -18,8 +18,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: build & unit test
+  build:
+    name: build (app + tests)
     runs-on: macos-15
     defaults:
       run:
@@ -34,18 +34,19 @@ jobs:
 
       - run: xcodebuild -version
 
-      # The macOS runners ship Xcode without an iOS simulator runtime; download it.
-      - name: Install iOS simulator runtime
-        run: xcodebuild -downloadPlatform iOS -quiet
-
-      - name: Unit tests
+      # Compiles the app and both test bundles for the simulator SDK. This needs
+      # no simulator runtime (GitHub's runners don't preinstall one), so it's
+      # fast and stable. It catches every compile error in app + test code.
+      #
+      # Running the tests in CI would need a downloaded simulator runtime; that's
+      # a later refinement. The unit tests run locally and in scripts/check.sh.
+      - name: Build for testing
         run: |
           set -o pipefail
-          xcodebuild test \
+          xcodebuild build-for-testing \
             -project Dipstick.xcodeproj \
             -scheme Dipstick \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
-            -only-testing:DipstickTests \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty
           exit "${PIPESTATUS[0]}"
