@@ -1,0 +1,28 @@
+# golangci-lint config, shared by both backend modules.
+# Run locally with:  cd backend/<service> && golangci-lint run ./...
+version: "2"
+
+linters:
+  # The standard set: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+
+  settings:
+    errcheck:
+      exclude-functions:
+        # `defer tx.Rollback()` is the standard idiom — a no-op after Commit.
+        - (*database/sql.Tx).Rollback
+
+  exclusions:
+    presets:
+      # Don't flag the idiomatic unchecked calls: deferred Close(), tx.Rollback(),
+      # w.Write in HTTP handlers, etc.
+      - std-error-handling
+    rules:
+      # Tests deliberately ignore some return values (priming a cache, etc.).
+      - path: _test\.go
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt

@@ -1,0 +1,47 @@
+name: iOS
+
+# Kept separate from the backend workflow: it needs a macOS runner and is more
+# sensitive to toolchain drift, so its failures shouldn't gate backend changes.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: build & unit test
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: ios/Dipstick
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - run: xcodebuild -version
+
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Dipstick.xcodeproj \
+            -scheme Dipstick \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -only-testing:DipstickTests \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty
+          exit "${PIPESTATUS[0]}"
