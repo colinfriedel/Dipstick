@@ -1,0 +1,52 @@
+name: iOS
+
+# Kept separate from the backend workflow: it needs a macOS runner and is more
+# sensitive to toolchain drift, so its failures shouldn't gate backend changes.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (app + tests)
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: ios/Dipstick
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - run: xcodebuild -version
+
+      # Compiles the app and both test bundles for the simulator SDK. This needs
+      # no simulator runtime (GitHub's runners don't preinstall one), so it's
+      # fast and stable. It catches every compile error in app + test code.
+      #
+      # Running the tests in CI would need a downloaded simulator runtime; that's
+      # a later refinement. The unit tests run locally and in scripts/check.sh.
+      - name: Build for testing
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project Dipstick.xcodeproj \
+            -scheme Dipstick \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty
+          exit "${PIPESTATUS[0]}"
