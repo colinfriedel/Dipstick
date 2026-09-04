@@ -34,13 +34,17 @@ jobs:
 
       - run: xcodebuild -version
 
+      # The macOS runners ship Xcode without an iOS simulator runtime; download it.
+      - name: Install iOS simulator runtime
+        run: xcodebuild -downloadPlatform iOS -quiet
+
       - name: Unit tests
         run: |
           set -o pipefail
           xcodebuild test \
             -project Dipstick.xcodeproj \
             -scheme Dipstick \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
             -only-testing:DipstickTests \
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty
