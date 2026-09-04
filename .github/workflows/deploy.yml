@@ -1,0 +1,38 @@
+name: Deploy
+
+# Runs after the Backend workflow finishes successfully on main (i.e. tests +
+# lint passed and fresh images were pushed to GHCR). This is the "push to main
+# deploys automatically, no manual steps" piece.
+#
+# Requires three repo secrets:
+#   DEPLOY_HOST      the VM's public IP
+#   DEPLOY_USER      the SSH user (e.g. ubuntu)
+#   DEPLOY_SSH_KEY   the private key whose public half is on the VM
+on:
+  workflow_run:
+    workflows: [Backend]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH in and update the stack
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/Dipstick
+            git pull --ff-only
+            ./deploy/deploy.sh

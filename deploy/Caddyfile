@@ -1,0 +1,20 @@
+# Caddy config. Caddy automatically obtains and renews Let's Encrypt
+# certificates for each named site over HTTP-01, so plain HTTP on :80 must be
+# reachable from the internet (open port 80 and 443 in the Oracle security list).
+#
+# The two domains resolve (via DuckDNS A records) to this VM's public IP; Caddy
+# routes each to the right service on the internal Docker network.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$VEHICLE_DOMAIN} {
+	encode gzip
+	reverse_proxy vehicle-service:8080
+}
+
+{$ACTIVITY_DOMAIN} {
+	encode gzip
+	reverse_proxy activity-service:8080
+}
