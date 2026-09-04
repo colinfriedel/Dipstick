@@ -1,0 +1,112 @@
+# Production stack for the Oracle Cloud VM.
+#
+# Unlike the dev compose file at the repo root, this one PULLS the service images
+# from GHCR (built by CI) instead of building them, and adds Caddy in front for
+# TLS termination + automatic HTTPS.
+#
+# Run it from this directory:
+#   ./deploy.sh                       # pull, migrate, restart
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Config comes from ./.env (git-ignored) — see .env.example.
+
+name: dipstick
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: dipstick
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: dipstick
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../backend/db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dipstick -d dipstick"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  vehicle-migrate:
+    image: migrate/migrate:v4.18.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../backend/vehicle-service/migrations:/migrations:ro
+    command:
+      [
+        "-path", "/migrations",
+        "-database", "postgres://dipstick:${POSTGRES_PASSWORD}@postgres:5432/dipstick?sslmode=disable&search_path=vehicle",
+        "up",
+      ]
+    restart: on-failure
+
+  activity-migrate:
+    image: migrate/migrate:v4.18.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../backend/activity-service/migrations:/migrations:ro
+    command:
+      [
+        "-path", "/migrations",
+        "-database", "postgres://dipstick:${POSTGRES_PASSWORD}@postgres:5432/dipstick?sslmode=disable&search_path=activity",
+        "up",
+      ]
+    restart: on-failure
+
+  vehicle-service:
+    image: ghcr.io/colinfriedel/dipstick-vehicle-service:${IMAGE_TAG:-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vehicle-migrate:
+        condition: service_completed_successfully
+    environment:
+      PORT: "8080"
+      DB_SCHEMA: vehicle
+      DATABASE_URL: "postgres://dipstick:${POSTGRES_PASSWORD}@postgres:5432/dipstick?sslmode=disable"
+    restart: unless-stopped
+
+  activity-service:
+    image: ghcr.io/colinfriedel/dipstick-activity-service:${IMAGE_TAG:-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      activity-migrate:
+        condition: service_completed_successfully
+      vehicle-service:
+        condition: service_started
+    environment:
+      PORT: "8080"
+      DB_SCHEMA: activity
+      DATABASE_URL: "postgres://dipstick:${POSTGRES_PASSWORD}@postgres:5432/dipstick?sslmode=disable"
+      VEHICLE_SERVICE_URL: "http://vehicle-service:8080"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    depends_on:
+      - vehicle-service
+      - activity-service
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      VEHICLE_DOMAIN: ${VEHICLE_DOMAIN:?set VEHICLE_DOMAIN in deploy/.env}
+      ACTIVITY_DOMAIN: ${ACTIVITY_DOMAIN:?set ACTIVITY_DOMAIN in deploy/.env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
