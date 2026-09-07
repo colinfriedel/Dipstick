@@ -1,4 +1,4 @@
-# Production stack for the Oracle Cloud VM.
+# Production stack for the deploy VM (GCP e2-micro free tier).
 #
 # Unlike the dev compose file at the repo root, this one PULLS the service images
 # from GHCR (built by CI) instead of building them, and adds Caddy in front for
@@ -12,9 +12,19 @@
 
 name: dipstick
 
+# Cap every container's logs so months of output can't fill the 30 GB disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:17
+    # Trim max_connections for the 1 GB e2-micro — our two services use ~20
+    # pooled connections total, so 40 is ample headroom.
+    command: ["postgres", "-c", "max_connections=40"]
     environment:
       POSTGRES_USER: dipstick
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
@@ -28,6 +38,7 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    logging: *default-logging
 
   vehicle-migrate:
     image: migrate/migrate:v4.18.1
@@ -43,6 +54,7 @@ services:
         "up",
       ]
     restart: on-failure
+    logging: *default-logging
 
   activity-migrate:
     image: migrate/migrate:v4.18.1
@@ -58,6 +70,7 @@ services:
         "up",
       ]
     restart: on-failure
+    logging: *default-logging
 
   vehicle-service:
     image: ghcr.io/colinfriedel/dipstick-vehicle-service:${IMAGE_TAG:-latest}
@@ -71,6 +84,7 @@ services:
       DB_SCHEMA: vehicle
       DATABASE_URL: "postgres://dipstick:${POSTGRES_PASSWORD}@postgres:5432/dipstick?sslmode=disable"
     restart: unless-stopped
+    logging: *default-logging
 
   activity-service:
     image: ghcr.io/colinfriedel/dipstick-activity-service:${IMAGE_TAG:-latest}
@@ -87,6 +101,7 @@ services:
       DATABASE_URL: "postgres://dipstick:${POSTGRES_PASSWORD}@postgres:5432/dipstick?sslmode=disable"
       VEHICLE_SERVICE_URL: "http://vehicle-service:8080"
     restart: unless-stopped
+    logging: *default-logging
 
   # Keeps the two DuckDNS names pointed at whatever the VM's current public IP is,
   # so we don't need a reserved IP. Empty `ip=` tells DuckDNS to use the source
@@ -103,6 +118,7 @@ services:
            sleep 300;
          done'
     restart: unless-stopped
+    logging: *default-logging
 
   caddy:
     image: caddy:2
@@ -121,6 +137,7 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     restart: unless-stopped
+    logging: *default-logging
 
 volumes:
   postgres-data:

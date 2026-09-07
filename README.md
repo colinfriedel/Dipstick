@@ -59,7 +59,7 @@ run it on a device, use the app's **Settings › Server** to point it at your Ma
 
 ## Deployment
 
-Both services + Postgres + Caddy (auto-HTTPS) run via `docker compose` on an
-Oracle Cloud "Always Free" VM; DNS is two DuckDNS subdomains. Every push to
+Both services + Postgres + Caddy (auto-HTTPS) run via `docker compose` on a
+small Linux VM (GCP free tier); DNS is two DuckDNS subdomains. Every push to
 `main` runs CI, pushes images to GHCR, then the **deploy.yml** workflow SSHes in
 and runs `deploy/deploy.sh`. Full runbook: [`deploy/README.md`](deploy/README.md).
