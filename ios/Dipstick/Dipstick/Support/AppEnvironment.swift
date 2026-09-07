@@ -20,8 +20,8 @@ enum AppEnvironment {
     static let activityOverrideKey = "activityBaseURLOverride"
 
     // The deployed services (Oracle Cloud VM, DuckDNS + Caddy HTTPS).
-    static let defaultVehicleURLString = "https://dipstick.duckdns.org"
-    static let defaultActivityURLString = "https://dipstick-activity.duckdns.org"
+    static let defaultVehicleURLString = "https://cf-dipstick.duckdns.org"
+    static let defaultActivityURLString = "https://cf-dipstick-activity.duckdns.org"
 
     static var vehicleServiceURL: URL {
         resolve(overrideKey: vehicleOverrideKey,
