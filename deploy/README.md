@@ -6,8 +6,8 @@ ones CI pushes to GHCR. DNS is two DuckDNS subdomains.
 
 ```
             DuckDNS A records
-  dipstick.duckdns.org ─────────┐
-  dipstick-activity.duckdns.org ┤ ──▶  VM public IP  ──▶  Caddy :80/:443
+  cf-dipstick.duckdns.org ─────────┐
+  cf-dipstick-activity.duckdns.org ┤ ──▶  VM public IP  ──▶  Caddy :80/:443
                                         (TLS, Let's Encrypt)
                                               │
                           ┌───────────────────┴───────────────────┐
@@ -58,8 +58,8 @@ cp .env.example .env && nano .env      # password, the two domains, your email
 Caddy gets certificates on first start (needs port 80 reachable). Check:
 
 ```bash
-curl https://dipstick.duckdns.org/healthz
-curl https://dipstick-activity.duckdns.org/healthz
+curl https://cf-dipstick.duckdns.org/healthz
+curl https://cf-dipstick-activity.duckdns.org/healthz
 ```
 
 ## Ongoing
