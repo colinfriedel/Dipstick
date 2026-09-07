@@ -1,61 +1,72 @@
 # Deploying Dipstick
 
-The backend runs on a single Oracle Cloud "Always Free" VM: Postgres + both Go
-services + Caddy (for automatic HTTPS), all via `docker compose`. Images are the
-ones CI pushes to GHCR. DNS is two DuckDNS subdomains.
+The backend runs on a single small Linux VM (GCP "Always Free" `e2-micro`):
+Postgres + both Go services + Caddy (automatic HTTPS), all via `docker compose`.
+Images are the ones CI pushes to GHCR. DNS is two DuckDNS subdomains, kept
+current by a container in the stack.
 
 ```
             DuckDNS A records
   cf-dipstick.duckdns.org ─────────┐
-  cf-dipstick-activity.duckdns.org ┤ ──▶  VM public IP  ──▶  Caddy :80/:443
-                                        (TLS, Let's Encrypt)
-                                              │
-                          ┌───────────────────┴───────────────────┐
-                    vehicle-service:8080                  activity-service:8080
-                          └───────────────────┬───────────────────┘
-                                          Postgres
+  cf-dipstick-activity.duckdns.org ┤ ──▶  VM external IP  ──▶  Caddy :80/:443
+                                          (TLS, Let's Encrypt)
+                                                │
+                          ┌─────────────────────┴─────────────────────┐
+                    vehicle-service:8080                    activity-service:8080
+                          └─────────────────────┬─────────────────────┘
+                                            Postgres
 ```
 
 ## One-time setup
 
-### On Oracle Cloud (console)
+### 1. The VM (Google Cloud console)
 
-1. Create a VM: Ubuntu 24.04, shape `VM.Standard.A1.Flex` (1 OCPU / 6 GB — free)
-   or `VM.Standard.E2.1.Micro` if A1 is out of capacity. Paste
-   `~/.ssh/dipstick_deploy.pub` as the SSH key.
-2. Open ingress for TCP **80** and **443** from `0.0.0.0/0` in the VCN's
-   Security List (only 22 is open by default).
+1. Create a project (e.g. `dipstick`). Enable the Compute Engine API when prompted.
+2. **Compute Engine → VM instances → Create instance**:
+   - **Name:** `dipstick`
+   - **Region:** `us-west1` (or `us-central1` / `us-east1` — only these are free
+     for `e2-micro`). **Zone:** any.
+   - **Machine configuration:** series **E2**, type **e2-micro**.
+   - **Boot disk → Change:** OS **Ubuntu**, version **Ubuntu 24.04 LTS**,
+     **Standard persistent disk**, **30 GB**.
+   - **Networking / Firewall:** check **Allow HTTP traffic** and
+     **Allow HTTPS traffic**.
+   - **Security → Manage access → Add manually generated SSH key:** paste your
+     public key with `ubuntu` as the trailing username:
+     `ssh-ed25519 AAAA...  ubuntu`
+     (GCP uses the last field as the Linux username.)
+3. Create. Note the **External IP**.
 
-The VM's ephemeral public IP is fine — the `duckdns` container in the compose
-stack re-points both names at the current IP every 5 minutes, so a stop/start
-that changes the IP self-heals within a few minutes.
+The external IP is ephemeral; the `duckdns` container re-points both names at the
+current IP every 5 minutes, so a restart that changes it self-heals.
 
-### DuckDNS
+### 2. DuckDNS
 
-Create two subdomains (`dipstick`, `dipstick-activity`). Set each to the VM's
-current public IP once (the `duckdns` container keeps them updated afterward).
-Copy your **token** from the top of the page — it goes in `deploy/.env`.
+Two subdomains already claimed: `cf-dipstick`, `cf-dipstick-activity`. Set each to
+the VM's external IP once. Copy your **token** from the top of the page — it goes
+in `deploy/.env`.
 
-### GitHub
+### 3. GitHub
 
 - Make the two GHCR packages **public**
   (github.com/users/colinfriedel/packages → each package → Package settings →
   Change visibility). Then the VM pulls without authenticating.
-- Add repo secrets: `DEPLOY_HOST` (VM IP), `DEPLOY_USER` (`ubuntu`),
+- Add repo secrets (Settings → Secrets and variables → Actions):
+  `DEPLOY_HOST` (external IP), `DEPLOY_USER` (`ubuntu`),
   `DEPLOY_SSH_KEY` (contents of `~/.ssh/dipstick_deploy`).
 
-### On the VM
+### 4. On the VM
 
 ```bash
-ssh -i ~/.ssh/dipstick_deploy ubuntu@<VM_IP>
+ssh -i ~/.ssh/dipstick_deploy ubuntu@<EXTERNAL_IP>
 curl -fsSL https://raw.githubusercontent.com/colinfriedel/Dipstick/main/deploy/bootstrap.sh | bash
-# log out, back in
+# log out, back in (docker group)
 cd ~/Dipstick/deploy
-cp .env.example .env && nano .env      # password, the two domains, your email
+cp .env.example .env && nano .env      # Postgres password, your email, DuckDNS token
 ./deploy.sh
 ```
 
-Caddy gets certificates on first start (needs port 80 reachable). Check:
+Caddy fetches certificates on first start (needs port 80 reachable). Check:
 
 ```bash
 curl https://cf-dipstick.duckdns.org/healthz
@@ -70,3 +81,10 @@ curl https://cf-dipstick-activity.duckdns.org/healthz
 - **Roll back:** set `IMAGE_TAG=sha-<commit>` in `deploy/.env`, run `./deploy.sh`.
 - **Logs:** `docker compose -f docker-compose.prod.yml logs -f <service>`.
 - **DB backup:** `docker compose -f docker-compose.prod.yml exec postgres pg_dump -U dipstick dipstick | gzip > backup-$(date +%F).sql.gz`
+
+## Notes on the free tier
+
+- `e2-micro` is 1 GB RAM; `bootstrap.sh` adds a 2 GB swap file and Postgres runs
+  with `max_connections=40`.
+- GCP Always Free includes ~1 GB/month of outbound data. JSON API responses are
+  tiny, so this is not a practical limit for personal use.
