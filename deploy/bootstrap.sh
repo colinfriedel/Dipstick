@@ -33,11 +33,12 @@ echo "==> Adding $USER to the docker group"
 sudo usermod -aG docker "$USER"
 
 echo "==> Opening ports 80 and 443 in the host firewall"
-# Oracle's Ubuntu images ship iptables rules that block everything but 22.
+# Oracle's Ubuntu images ship iptables rules that REJECT most inbound traffic.
+# Insert ACCEPT rules at the top of the INPUT chain so they beat the REJECT.
 # (You ALSO need to open 80/443 in the VCN security list in the OCI console.)
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
-sudo netfilter-persistent save || sudo sh -c 'iptables-save > /etc/iptables/rules.v4'
+sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+sudo netfilter-persistent save 2>/dev/null || sudo sh -c 'iptables-save > /etc/iptables/rules.v4'
 
 echo "==> Cloning the repo to $CHECKOUT"
 if [[ -d "$CHECKOUT/.git" ]]; then
