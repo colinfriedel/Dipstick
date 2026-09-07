@@ -88,6 +88,22 @@ services:
       VEHICLE_SERVICE_URL: "http://vehicle-service:8080"
     restart: unless-stopped
 
+  # Keeps the two DuckDNS names pointed at whatever the VM's current public IP is,
+  # so we don't need a reserved IP. Empty `ip=` tells DuckDNS to use the source
+  # address of the request (this container's egress = the VM's public IP).
+  duckdns:
+    image: curlimages/curl:latest
+    environment:
+      DUCKDNS_DOMAINS: ${DUCKDNS_DOMAINS:?set DUCKDNS_DOMAINS in deploy/.env}
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:?set DUCKDNS_TOKEN in deploy/.env}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'while true; do
+           curl -fsS "https://www.duckdns.org/update?domains=$${DUCKDNS_DOMAINS}&token=$${DUCKDNS_TOKEN}&ip=" && echo " [duckdns] updated $(date -u)";
+           sleep 300;
+         done'
+    restart: unless-stopped
+
   caddy:
     image: caddy:2
     depends_on:

@@ -23,15 +23,18 @@ ones CI pushes to GHCR. DNS is two DuckDNS subdomains.
 1. Create a VM: Ubuntu 24.04, shape `VM.Standard.A1.Flex` (1 OCPU / 6 GB — free)
    or `VM.Standard.E2.1.Micro` if A1 is out of capacity. Paste
    `~/.ssh/dipstick_deploy.pub` as the SSH key.
-2. Reserve the public IP (Instance → attached VNIC → IPv4 → Edit → make it
-   reserved) so it survives a stop/start.
-3. Open ingress for TCP **80** and **443** from `0.0.0.0/0` in the subnet's
+2. Open ingress for TCP **80** and **443** from `0.0.0.0/0` in the VCN's
    Security List (only 22 is open by default).
+
+The VM's ephemeral public IP is fine — the `duckdns` container in the compose
+stack re-points both names at the current IP every 5 minutes, so a stop/start
+that changes the IP self-heals within a few minutes.
 
 ### DuckDNS
 
-Create two subdomains (`dipstick`, `dipstick-activity`), both pointing at the
-VM's public IP.
+Create two subdomains (`dipstick`, `dipstick-activity`). Set each to the VM's
+current public IP once (the `duckdns` container keeps them updated afterward).
+Copy your **token** from the top of the page — it goes in `deploy/.env`.
 
 ### GitHub
 
