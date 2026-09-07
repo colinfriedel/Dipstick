@@ -5,10 +5,11 @@ import Foundation
 /// Each backend service's URL is resolved fresh on every access, in this order:
 ///   1. the in-app override the user typed in Settings (persisted in UserDefaults)
 ///   2. a `DIPSTICK_*_URL` environment variable (set in the Xcode scheme)
-///   3. the built-in default (the local Docker stack)
+///   3. the built-in default — the deployed backend, so a fresh install just works
 ///
-/// For local development against `docker compose`, set both overrides to your Mac
-/// (e.g. `http://Colins-MacBook-Air.local:8081` and `…:8082`).
+/// For local development against `docker compose`, set both overrides in
+/// Settings › Server to your Mac (e.g. `http://Colins-MacBook-Air.local:8081`
+/// and `…:8082`).
 @MainActor
 enum AppEnvironment {
 
@@ -18,8 +19,9 @@ enum AppEnvironment {
     static let vehicleOverrideKey = "backendBaseURLOverride"       // kept from M5
     static let activityOverrideKey = "activityBaseURLOverride"
 
-    static let defaultVehicleURLString = "http://localhost:8081"
-    static let defaultActivityURLString = "http://localhost:8082"
+    // The deployed services (Oracle Cloud VM, DuckDNS + Caddy HTTPS).
+    static let defaultVehicleURLString = "https://dipstick.duckdns.org"
+    static let defaultActivityURLString = "https://dipstick-activity.duckdns.org"
 
     static var vehicleServiceURL: URL {
         resolve(overrideKey: vehicleOverrideKey,

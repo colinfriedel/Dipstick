@@ -57,4 +57,9 @@ run it on a device, use the app's **Settings › Server** to point it at your Ma
   downloaded simulator runtime — a later refinement; they run locally and in
   `scripts/check.sh`-adjacent workflows.
 
-Deployment (DNS, HTTPS, a running host) is a later milestone.
+## Deployment
+
+Both services + Postgres + Caddy (auto-HTTPS) run via `docker compose` on an
+Oracle Cloud "Always Free" VM; DNS is two DuckDNS subdomains. Every push to
+`main` runs CI, pushes images to GHCR, then the **deploy.yml** workflow SSHes in
+and runs `deploy/deploy.sh`. Full runbook: [`deploy/README.md`](deploy/README.md).
