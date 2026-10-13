@@ -1,0 +1,554 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 110;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		C4FF2FA2307DB73400FC06E6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C4FF2F8A307DB73200FC06E6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C4FF2F91307DB73200FC06E6;
+			remoteInfo = Dipstick;
+		};
+		C4FF2FAC307DB73400FC06E6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C4FF2F8A307DB73200FC06E6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C4FF2F91307DB73200FC06E6;
+			remoteInfo = Dipstick;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		C4FF2F92307DB73200FC06E6 /* Dipstick.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dipstick.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C4FF2FA1307DB73400FC06E6 /* DipstickTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DipstickTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C4FF2FAB307DB73400FC06E6 /* DipstickUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DipstickUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		C4FF2F94307DB73200FC06E6 /* Dipstick */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Dipstick;
+			sourceTree = "<group>";
+		};
+		C4FF2FA4307DB73400FC06E6 /* DipstickTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DipstickTests;
+			sourceTree = "<group>";
+		};
+		C4FF2FAE307DB73400FC06E6 /* DipstickUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DipstickUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C4FF2F8F307DB73200FC06E6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		C4FF2F9E307DB73400FC06E6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		C4FF2FA8307DB73400FC06E6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		C4FF2F89307DB73200FC06E6 = {
+			isa = PBXGroup;
+			children = (
+				C4FF2F94307DB73200FC06E6 /* Dipstick */,
+				C4FF2FA4307DB73400FC06E6 /* DipstickTests */,
+				C4FF2FAE307DB73400FC06E6 /* DipstickUITests */,
+				C4FF2F93307DB73200FC06E6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C4FF2F93307DB73200FC06E6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C4FF2F92307DB73200FC06E6 /* Dipstick.app */,
+				C4FF2FA1307DB73400FC06E6 /* DipstickTests.xctest */,
+				C4FF2FAB307DB73400FC06E6 /* DipstickUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C4FF2F91307DB73200FC06E6 /* Dipstick */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C4FF2FB3307DB73400FC06E6 /* Build configuration list for PBXNativeTarget "Dipstick" */;
+			buildPhases = (
+				C4FF2F8E307DB73200FC06E6 /* Sources */,
+				C4FF2F8F307DB73200FC06E6 /* Frameworks */,
+				C4FF2F90307DB73200FC06E6 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				C4FF2F94307DB73200FC06E6 /* Dipstick */,
+			);
+			name = Dipstick;
+			productName = Dipstick;
+			productReference = C4FF2F92307DB73200FC06E6 /* Dipstick.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C4FF2FA0307DB73400FC06E6 /* DipstickTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C4FF2FB6307DB73400FC06E6 /* Build configuration list for PBXNativeTarget "DipstickTests" */;
+			buildPhases = (
+				C4FF2F9D307DB73400FC06E6 /* Sources */,
+				C4FF2F9E307DB73400FC06E6 /* Frameworks */,
+				C4FF2F9F307DB73400FC06E6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C4FF2FA3307DB73400FC06E6 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C4FF2FA4307DB73400FC06E6 /* DipstickTests */,
+			);
+			name = DipstickTests;
+			productName = DipstickTests;
+			productReference = C4FF2FA1307DB73400FC06E6 /* DipstickTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		C4FF2FAA307DB73400FC06E6 /* DipstickUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C4FF2FB9307DB73400FC06E6 /* Build configuration list for PBXNativeTarget "DipstickUITests" */;
+			buildPhases = (
+				C4FF2FA7307DB73400FC06E6 /* Sources */,
+				C4FF2FA8307DB73400FC06E6 /* Frameworks */,
+				C4FF2FA9307DB73400FC06E6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C4FF2FAD307DB73400FC06E6 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C4FF2FAE307DB73400FC06E6 /* DipstickUITests */,
+			);
+			name = DipstickUITests;
+			productName = DipstickUITests;
+			productReference = C4FF2FAB307DB73400FC06E6 /* DipstickUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C4FF2F8A307DB73200FC06E6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					C4FF2F91307DB73200FC06E6 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					C4FF2FA0307DB73400FC06E6 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = C4FF2F91307DB73200FC06E6;
+					};
+					C4FF2FAA307DB73400FC06E6 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = C4FF2F91307DB73200FC06E6;
+					};
+				};
+			};
+			buildConfigurationList = C4FF2F8D307DB73200FC06E6 /* Build configuration list for PBXProject "Dipstick" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = C4FF2F89307DB73200FC06E6;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = C4FF2F93307DB73200FC06E6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C4FF2F91307DB73200FC06E6 /* Dipstick */,
+				C4FF2FA0307DB73400FC06E6 /* DipstickTests */,
+				C4FF2FAA307DB73400FC06E6 /* DipstickUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C4FF2F90307DB73200FC06E6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		C4FF2F9F307DB73400FC06E6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		C4FF2FA9307DB73400FC06E6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C4FF2F8E307DB73200FC06E6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		C4FF2F9D307DB73400FC06E6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		C4FF2FA7307DB73400FC06E6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		C4FF2FA3307DB73400FC06E6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C4FF2F91307DB73200FC06E6 /* Dipstick */;
+			targetProxy = C4FF2FA2307DB73400FC06E6 /* PBXContainerItemProxy */;
+		};
+		C4FF2FAD307DB73400FC06E6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C4FF2F91307DB73200FC06E6 /* Dipstick */;
+			targetProxy = C4FF2FAC307DB73400FC06E6 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		C4FF2FB1307DB73400FC06E6 /* Debug configuration for PBXProject "Dipstick" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 7JB6DQH6B7;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		C4FF2FB2307DB73400FC06E6 /* Release configuration for PBXProject "Dipstick" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 7JB6DQH6B7;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		C4FF2FB4307DB73400FC06E6 /* Debug configuration for PBXNativeTarget "Dipstick" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7JB6DQH6B7;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.colinfriedel.Dipstick;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C4FF2FB5307DB73400FC06E6 /* Release configuration for PBXNativeTarget "Dipstick" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7JB6DQH6B7;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.colinfriedel.Dipstick;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		C4FF2FB7307DB73400FC06E6 /* Debug configuration for PBXNativeTarget "DipstickTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7JB6DQH6B7;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.colinfriedel.DipstickTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dipstick.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Dipstick";
+			};
+			name = Debug;
+		};
+		C4FF2FB8307DB73400FC06E6 /* Release configuration for PBXNativeTarget "DipstickTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7JB6DQH6B7;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.colinfriedel.DipstickTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dipstick.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Dipstick";
+			};
+			name = Release;
+		};
+		C4FF2FBA307DB73400FC06E6 /* Debug configuration for PBXNativeTarget "DipstickUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7JB6DQH6B7;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.colinfriedel.DipstickUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Dipstick;
+			};
+			name = Debug;
+		};
+		C4FF2FBB307DB73400FC06E6 /* Release configuration for PBXNativeTarget "DipstickUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7JB6DQH6B7;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.colinfriedel.DipstickUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Dipstick;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C4FF2F8D307DB73200FC06E6 /* Build configuration list for PBXProject "Dipstick" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4FF2FB1307DB73400FC06E6 /* Debug configuration for PBXProject "Dipstick" */,
+				C4FF2FB2307DB73400FC06E6 /* Release configuration for PBXProject "Dipstick" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		C4FF2FB3307DB73400FC06E6 /* Build configuration list for PBXNativeTarget "Dipstick" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4FF2FB4307DB73400FC06E6 /* Debug configuration for PBXNativeTarget "Dipstick" */,
+				C4FF2FB5307DB73400FC06E6 /* Release configuration for PBXNativeTarget "Dipstick" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		C4FF2FB6307DB73400FC06E6 /* Build configuration list for PBXNativeTarget "DipstickTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4FF2FB7307DB73400FC06E6 /* Debug configuration for PBXNativeTarget "DipstickTests" */,
+				C4FF2FB8307DB73400FC06E6 /* Release configuration for PBXNativeTarget "DipstickTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		C4FF2FB9307DB73400FC06E6 /* Build configuration list for PBXNativeTarget "DipstickUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4FF2FBA307DB73400FC06E6 /* Debug configuration for PBXNativeTarget "DipstickUITests" */,
+				C4FF2FBB307DB73400FC06E6 /* Release configuration for PBXNativeTarget "DipstickUITests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C4FF2F8A307DB73200FC06E6 /* Project object */;
+	validationLevel = 1;
+}
