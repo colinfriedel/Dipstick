@@ -13,6 +13,7 @@ final class FuelEntry {
     var date: Date = Date()
     var odometer: Int = 0
     var gallons: Double = 0
+    /// 0 means the cost wasn't recorded (no real fill-up is free). Stats skip it.
     var totalCost: Double = 0
     var isFullTank: Bool = true
     var station: String?
@@ -37,8 +38,10 @@ final class FuelEntry {
         self.notes = notes
     }
 
+    var isCostKnown: Bool { totalCost > 0 }
+
     var pricePerGallon: Double? {
-        gallons > 0 ? totalCost / gallons : nil
+        gallons > 0 && isCostKnown ? totalCost / gallons : nil
     }
 
     /// The plain values `MPGCalculator` needs, keyed by this entry's identity.

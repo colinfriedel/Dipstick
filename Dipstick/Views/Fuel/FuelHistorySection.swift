@@ -77,7 +77,7 @@ private struct FuelEntryRow: View {
             HStack {
                 Text(Units.gallons(entry.gallons))
                 Text("·")
-                Text(Units.currency(entry.totalCost))
+                Text(entry.isCostKnown ? Units.currency(entry.totalCost) : "cost —")
                 if let price = entry.pricePerGallon {
                     Text("·")
                     Text(Units.pricePerGallon(price))

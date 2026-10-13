@@ -46,9 +46,13 @@ struct FuelStats {
     let totalSpend: Double
     let totalGallons: Double
     let spendThisYear: Double
+    /// From fill-ups with a known cost only.
     let averagePricePerGallon: Double?
-    /// Fuel cost per mile driven between the first and latest fill-up.
+    /// Fuel cost per mile driven between the first and latest fill-up. Fill-ups
+    /// with an unknown cost are counted at the average price.
     let costPerMile: Double?
+    /// Fill-ups with no recorded cost (left out of the spend totals).
+    let unknownCostCount: Int
     /// The last 12 months including the current one, oldest first; months with
     /// no fill-ups are 0 so the chart has no gaps.
     let monthlySpend: [MonthSpend]
@@ -69,10 +73,14 @@ struct FuelStats {
         best = tanks.max { $0.mpg < $1.mpg }
         worst = tanks.min { $0.mpg < $1.mpg }
 
-        // Spend.
-        totalSpend = sorted.reduce(0) { $0 + $1.totalCost }
+        // Spend. A cost of 0 means unknown, so it adds nothing to the totals
+        // and is left out of the price.
+        let known = sorted.filter { $0.totalCost > 0 }
+        totalSpend = known.reduce(0) { $0 + $1.totalCost }
         totalGallons = sorted.reduce(0) { $0 + $1.gallons }
-        averagePricePerGallon = totalGallons > 0 ? totalSpend / totalGallons : nil
+        unknownCostCount = sorted.count - known.count
+        let knownGallons = known.reduce(0) { $0 + $1.gallons }
+        averagePricePerGallon = knownGallons > 0 ? totalSpend / knownGallons : nil
 
         let thisYear = calendar.component(.year, from: today)
         spendThisYear = sorted
@@ -81,8 +89,9 @@ struct FuelStats {
 
         // The first fill-up's fuel was burned before tracking started, so it
         // isn't part of the miles that follow.
-        if let first = sorted.first, let last = sorted.last, last.odometer > first.odometer {
-            let cost = sorted.dropFirst().reduce(0) { $0 + $1.totalCost }
+        if let first = sorted.first, let last = sorted.last, last.odometer > first.odometer,
+           let price = averagePricePerGallon {
+            let cost = sorted.dropFirst().reduce(0) { $0 + ($1.totalCost > 0 ? $1.totalCost : $1.gallons * price) }
             costPerMile = cost / Double(last.odometer - first.odometer)
         } else {
             costPerMile = nil

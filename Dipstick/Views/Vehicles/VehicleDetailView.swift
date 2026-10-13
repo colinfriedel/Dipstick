@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 /// One vehicle's details, with a switch between its fuel log, maintenance log
 /// and stats.
@@ -29,6 +30,16 @@ struct VehicleDetailView: View {
     @State private var editingServiceEntry: MaintenanceEntry?
     @State private var log: Log = .fuel
     @State private var isUpdatingOdometer = false
+    @State private var isImporting = false
+    @State private var importFile: ImportFile?
+    @State private var importError: String?
+
+    /// A CSV the user picked, parsed and waiting for confirmation.
+    struct ImportFile: Identifiable {
+        let id = UUID()
+        let filename: String
+        let parsed: RecordCSV.Parsed
+    }
 
     var body: some View {
         List {
@@ -94,7 +105,34 @@ struct VehicleDetailView: View {
         }
         .navigationTitle(vehicle.name)
         .toolbar {
-            Button("Edit") { isEditing = true }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Edit") { isEditing = true }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Menu("More", systemImage: "ellipsis") {
+                    ShareLink(item: vehicle.csvExportFile, preview: SharePreview("\(vehicle.name) records")) {
+                        Label("Export CSV", systemImage: "square.and.arrow.up")
+                    }
+                    Button("Import CSV…", systemImage: "square.and.arrow.down") { isImporting = true }
+                }
+            }
+        }
+        .fileImporter(
+            isPresented: $isImporting,
+            allowedContentTypes: [.commaSeparatedText, .plainText]
+        ) { result in
+            readImport(result)
+        }
+        .sheet(item: $importFile) { file in
+            ImportPreviewView(vehicle: vehicle, filename: file.filename, parsed: file.parsed)
+        }
+        .alert("Couldn't read file", isPresented: Binding(
+            get: { importError != nil },
+            set: { if !$0 { importError = nil } }
+        )) {
+            Button("OK") {}
+        } message: {
+            Text(importError ?? "")
         }
         .sheet(isPresented: $isEditing) {
             VehicleFormView(vehicle: vehicle)
@@ -117,6 +155,19 @@ struct VehicleDetailView: View {
         .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in
             dismiss()
             modelContext.delete(vehicle)
+        }
+    }
+
+    private func readImport(_ result: Result<URL, Error>) {
+        do {
+            let url = try result.get()
+            // Files from the picker are outside the app's sandbox; ask for access.
+            let didAccess = url.startAccessingSecurityScopedResource()
+            defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+            let text = try String(contentsOf: url, encoding: .utf8)
+            importFile = ImportFile(filename: url.lastPathComponent, parsed: RecordCSV.decode(text))
+        } catch {
+            importError = error.localizedDescription
         }
     }
 }

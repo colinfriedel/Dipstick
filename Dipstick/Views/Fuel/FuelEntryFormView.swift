@@ -34,7 +34,7 @@ struct FuelEntryFormView: View {
         _gallons = State(initialValue: entry.map {
             $0.gallons.formatted(.number.precision(.fractionLength(0...3)).grouping(.never))
         } ?? "")
-        _totalCost = State(initialValue: entry.map { String(format: "%.2f", $0.totalCost) } ?? "")
+        _totalCost = State(initialValue: entry.flatMap { $0.isCostKnown ? String(format: "%.2f", $0.totalCost) : nil } ?? "")
         _isFullTank = State(initialValue: entry?.isFullTank ?? true)
         _station = State(initialValue: entry?.station ?? "")
         _notes = State(initialValue: entry?.notes ?? "")
@@ -52,8 +52,10 @@ struct FuelEntryFormView: View {
         Units.parseDecimal(gallons).flatMap { $0 > 0 ? $0 : nil }
     }
 
+    /// Blank = cost unknown (stored as 0). nil = not a valid amount.
     private var parsedTotalCost: Double? {
-        Units.parseDecimal(totalCost).flatMap { $0 >= 0 ? $0 : nil }
+        if totalCost.trimmingCharacters(in: .whitespaces).isEmpty { return 0 }
+        return Units.parseDecimal(totalCost).flatMap { $0 >= 0 ? $0 : nil }
     }
 
     /// This vehicle's other fill-ups (excluding the one being edited).
@@ -107,13 +109,18 @@ struct FuelEntryFormView: View {
                             .multilineTextAlignment(.trailing)
                             .focused($focusedField, equals: .totalCost)
                     }
-                    if let gallons = parsedGallons, let cost = parsedTotalCost {
+                    if let gallons = parsedGallons, let cost = parsedTotalCost, cost > 0 {
                         LabeledContent("Price", value: Units.pricePerGallon(cost / gallons))
                     }
                     Toggle("Filled the tank", isOn: $isFullTank)
                 } footer: {
-                    if !isFullTank {
-                        Text("Partial fills aren't given their own MPG. Their gallons count toward the next full tank.")
+                    VStack(alignment: .leading, spacing: 4) {
+                        if totalCost.trimmingCharacters(in: .whitespaces).isEmpty {
+                            Text("Don't know the cost? Leave it blank; spend stats will skip this fill-up.")
+                        }
+                        if !isFullTank {
+                            Text("Partial fills aren't given their own MPG. Their gallons count toward the next full tank.")
+                        }
                     }
                 }
 

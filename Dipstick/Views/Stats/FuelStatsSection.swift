@@ -41,7 +41,7 @@ struct FuelStatsSection: View {
             }
         }
 
-        Section("Fuel spend") {
+        Section {
             LabeledContent("This year", value: Units.currency(stats.spendThisYear))
             LabeledContent("All time", value: Units.currency(stats.totalSpend))
             if let price = stats.averagePricePerGallon {
@@ -59,6 +59,12 @@ struct FuelStatsSection: View {
                         .frame(height: 180)
                 }
                 .padding(.vertical, 8)
+            }
+        } header: {
+            Text("Fuel spend")
+        } footer: {
+            if stats.unknownCostCount > 0 {
+                Text("\(stats.unknownCostCount) fill-up\(stats.unknownCostCount == 1 ? "" : "s") with no recorded cost \(stats.unknownCostCount == 1 ? "isn't" : "aren't") included in spend or price.")
             }
         }
     }
