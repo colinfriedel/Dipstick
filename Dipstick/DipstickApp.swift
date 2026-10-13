@@ -10,9 +10,9 @@ import SwiftData
 
 @main
 struct DipstickApp: App {
-    @State private var tripRecorder = TripRecorder()
-
-    var sharedModelContainer: ModelContainer = {
+    /// Shared with the Start/Stop Trip Shortcuts actions, which can run with
+    /// no window open.
+    static let modelContainer: ModelContainer = {
         let schema = Schema([
             Vehicle.self,
             FuelEntry.self,
@@ -36,8 +36,8 @@ struct DipstickApp: App {
     var body: some Scene {
         WindowGroup {
             VehicleListView()
-                .environment(tripRecorder)
+                .environment(TripRecorder.shared)
         }
-        .modelContainer(sharedModelContainer)
+        .modelContainer(Self.modelContainer)
     }
 }

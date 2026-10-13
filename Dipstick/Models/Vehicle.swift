@@ -16,6 +16,10 @@ final class Vehicle {
     var model: String?
     var vin: String?
     var currentOdometer: Int = 0
+    /// The car's CarPlay/Bluetooth connection (`CarConnection.id`), so trips
+    /// started by connecting to it are assigned automatically.
+    var connectionID: String?
+    var connectionName: String?
 
     @Relationship(deleteRule: .cascade, inverse: \FuelEntry.vehicle)
     var fuelEntries: [FuelEntry]? = []

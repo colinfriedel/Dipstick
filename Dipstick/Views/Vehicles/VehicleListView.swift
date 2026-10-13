@@ -60,6 +60,10 @@ struct VehicleListView: View {
                     }
                 }
 
+                #if DEBUG
+                UnassignedTripsSection()
+                #endif
+
                 Section {
                     ForEach(vehicles) { vehicle in
                         NavigationLink(value: vehicle) {

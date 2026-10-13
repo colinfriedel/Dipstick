@@ -98,3 +98,60 @@ struct TripClassifierTests {
         #expect(TripClassifier.classify(Array(drive([(1, 30)]).prefix(1))).totalMiles == 0)
     }
 }
+
+#if DEBUG
+@MainActor
+struct SpeedLogTests {
+    @Test func logsSpeedsAndStepDistancesWithoutCoordinates() {
+        let start = Date(timeIntervalSince1970: 1_790_000_000)
+        let samples = (0..<3).map { i in
+            TripClassifier.Sample(timestamp: start + Double(i), latitude: 37.123456 + Double(i) * 0.0003,
+                                  longitude: -122.654321, speed: 26.8224, horizontalAccuracy: 5)
+        }
+        let lines = SpeedLog.csv(for: samples).split(separator: "\n").map(String.init)
+        #expect(lines.first == SpeedLog.header)
+        #expect(lines.count == 4)
+        #expect(lines[1].hasPrefix("0.0,60.00,0.00000,"))
+        #expect(lines[2].hasPrefix("1.0,60.00,0.020"))  // 0.0003° latitude ≈ 33 m ≈ 0.0207 mi
+        #expect(!SpeedLog.csv(for: samples).contains("37.12"))
+        #expect(!SpeedLog.csv(for: samples).contains("122.65"))
+    }
+}
+#endif
+
+@MainActor
+struct CarConnectionTests {
+    @Test func stableIDIsTheHardwareAddressPrefix() {
+        #expect(CarConnection.stableID(fromUID: "1C:50:1E:B4:BC:F1-Audio-AudioMain-1592965438827625") == "1C:50:1E:B4:BC:F1")
+        #expect(CarConnection.stableID(fromUID: "00:00:05:04:37:20-Audio-AudioMain-1593073765289416") == "00:00:05:04:37:20")
+        #expect(CarConnection.stableID(fromUID: "NoDashes") == "NoDashes")
+    }
+}
+
+@MainActor
+struct AutoStopTests {
+    private typealias Rule = TripRecorder.AutoStop
+    private let now = Date(timeIntervalSince1970: 1_790_000_000)
+
+    @Test func headUnitRebootWhileDrivingDoesNotStop() {
+        // Connection gone and Stop Trip ran, but you were moving 10 s ago.
+        #expect(!Rule.shouldStop(now: now, lastMoving: now - 10, connectionPresent: false, stopRequested: true))
+    }
+
+    @Test func redLightWhileDisconnectedDoesNotStop() {
+        #expect(!Rule.shouldStop(now: now, lastMoving: now - 90, connectionPresent: false, stopRequested: true))
+    }
+
+    @Test func parkedAndDisconnectedStops() {
+        #expect(Rule.shouldStop(now: now, lastMoving: now - 180, connectionPresent: false, stopRequested: false))
+    }
+
+    @Test func parkedButStillConnectedKeepsRecording() {
+        // Sitting in the driveway plugged in: wait for the unplug.
+        #expect(!Rule.shouldStop(now: now, lastMoving: now - 3_600, connectionPresent: true, stopRequested: false))
+    }
+
+    @Test func stopRequestWhileConnectedEndsOnceParked() {
+        #expect(Rule.shouldStop(now: now, lastMoving: now - 200, connectionPresent: true, stopRequested: true))
+    }
+}

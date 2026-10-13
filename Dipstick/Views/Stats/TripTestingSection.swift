@@ -39,14 +39,144 @@ struct TripTestingSection: View {
                     .swipeActions {
                         Button("Delete", role: .destructive) { modelContext.delete(trip) }
                     }
+                    .contextMenu {
+                        if let log = SpeedLog.existingURL(forTripStartingAt: trip.startDate) {
+                            ShareLink(item: log) {
+                                Label("Export Speed Log", systemImage: "square.and.arrow.up")
+                            }
+                        }
+                    }
             }
         } header: {
             Text("Trips (testing)")
         } footer: {
-            Text("Debug builds only. Record a drive to check the city/highway split.")
+            Text("Debug builds only. Record a drive to check the city/highway split. Long-press a trip to export its speed log (speeds only, no locations).")
         }
         .fullScreenCover(isPresented: $isShowingRecorder) {
             TripRecordingView()
+        }
+
+        AutomaticTripsSection(vehicle: vehicle)
+    }
+}
+
+/// Debug-only setup for automatic trips: Always location access and which
+/// CarPlay/Bluetooth connection belongs to this car.
+private struct AutomaticTripsSection: View {
+    let vehicle: Vehicle
+
+    @Environment(TripRecorder.self) private var recorder
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var message: String?
+
+    var body: some View {
+        Section {
+            LabeledContent("Location access") {
+                Text(recorder.canRecordInBackground ? "Always" : statusText)
+                    .foregroundStyle(recorder.canRecordInBackground ? Color.secondary : Color.orange)
+            }
+            if !recorder.canRecordInBackground {
+                Button("Allow Always Access", systemImage: "location.circle") {
+                    recorder.requestAlwaysAuthorization()
+                }
+                Text("If no prompt appears, open Settings > Privacy & Security > Location Services > Dipstick and choose Always.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            LabeledContent("Car connection") {
+                VStack(alignment: .trailing) {
+                    Text(vehicle.connectionName ?? "Not set")
+                    if let id = vehicle.connectionID {
+                        Text(id).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Button("Use Current Connection", systemImage: "link") {
+                if let connection = CarConnection.current() {
+                    vehicle.connectionID = connection.id
+                    vehicle.connectionName = connection.name
+                    message = "Linked to \(connection.name)."
+                } else {
+                    message = "Not connected to CarPlay or Bluetooth right now."
+                }
+            }
+            if vehicle.connectionID != nil {
+                Button("Unlink Connection", role: .destructive) {
+                    vehicle.connectionID = nil
+                    vehicle.connectionName = nil
+                    message = nil
+                }
+            }
+            if let message {
+                Text(message).font(.footnote).foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Automatic trips (testing)")
+        } footer: {
+            Text("Connect to this car, then tap Use Current Connection. Trips started by the Start Trip shortcut while connected to it are assigned to \(vehicle.name) automatically.")
+        }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active { recorder.refreshAuthorization() }
+        }
+    }
+
+    private var statusText: String {
+        switch recorder.authorizationStatus {
+        case .authorizedWhenInUse: "While Using"
+        case .denied: "Off"
+        case .restricted: "Restricted"
+        case .notDetermined: "Not asked yet"
+        default: "Unknown"
+        }
+    }
+}
+
+/// Home screen, Debug only: trips that started on an unknown connection (or
+/// none). Assigning one also teaches the app that connection, so future trips
+/// on it are assigned automatically.
+struct UnassignedTripsSection: View {
+    @Query(filter: #Predicate<Trip> { $0.vehicle == nil }, sort: \Trip.startDate, order: .reverse)
+    private var trips: [Trip]
+    @Query(sort: \Vehicle.name) private var vehicles: [Vehicle]
+    @Environment(\.modelContext) private var modelContext
+
+    var body: some View {
+        if !trips.isEmpty {
+            Section {
+                ForEach(trips) { trip in
+                    HStack {
+                        TripRow(trip: trip)
+                        Spacer()
+                        Menu {
+                            ForEach(vehicles) { vehicle in
+                                Button(vehicle.name) { assign(trip, to: vehicle) }
+                            }
+                            Divider()
+                            Button("Not My Car (Delete)", role: .destructive) {
+                                modelContext.delete(trip)
+                            }
+                        } label: {
+                            Image(systemName: "car.badge.gearshape")
+                                .font(.title3)
+                        }
+                        .accessibilityLabel("Assign trip")
+                    }
+                }
+            } header: {
+                Text("Unassigned trips (testing)")
+            } footer: {
+                Text("Pick the car to assign a trip. Its connection is remembered, so the next trip in that car is assigned automatically.")
+            }
+        }
+    }
+
+    private func assign(_ trip: Trip, to vehicle: Vehicle) {
+        trip.vehicle = vehicle
+        trip.status = .assigned
+        if vehicle.connectionID == nil, let id = trip.connectionID {
+            vehicle.connectionID = id
+            vehicle.connectionName = trip.connectionName
         }
     }
 }

@@ -184,5 +184,5 @@ struct VehicleDetailView: View {
     container.mainContext.insert(vehicle)
     return NavigationStack { VehicleDetailView(vehicle: vehicle) }
         .modelContainer(container)
-        .environment(TripRecorder())
+        .environment(TripRecorder.shared)
 }

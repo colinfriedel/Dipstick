@@ -27,6 +27,8 @@ final class Trip {
     /// Name of the car audio connection (CarPlay/Bluetooth) seen during the
     /// trip, used to recognize which car it was.
     var connectionName: String?
+    /// Stable ID of that connection (see `CarConnection.id`).
+    var connectionID: String?
     var vehicle: Vehicle?
 
     init(
@@ -35,7 +37,8 @@ final class Trip {
         cityMiles: Double,
         highwayMiles: Double,
         status: Status = .unreviewed,
-        connectionName: String? = nil
+        connectionName: String? = nil,
+        connectionID: String? = nil
     ) {
         self.startDate = startDate
         self.endDate = endDate
@@ -43,6 +46,7 @@ final class Trip {
         self.highwayMiles = highwayMiles
         self.statusRaw = status.rawValue
         self.connectionName = connectionName
+        self.connectionID = connectionID
     }
 
     var status: Status {
