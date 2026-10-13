@@ -20,7 +20,11 @@ struct DipstickApp: App {
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            #if DEBUG
+            SampleData.seedIfRequested(into: container.mainContext)
+            #endif
+            return container
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }

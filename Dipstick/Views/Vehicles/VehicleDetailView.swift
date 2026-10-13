@@ -6,14 +6,15 @@
 import SwiftUI
 import SwiftData
 
-/// One vehicle's details, with a switch between its fuel and maintenance logs.
-/// A Stats tab arrives in a later step.
+/// One vehicle's details, with a switch between its fuel log, maintenance log
+/// and stats.
 struct VehicleDetailView: View {
     let vehicle: Vehicle
 
     enum Log: String, CaseIterable, Identifiable {
         case fuel = "Fuel"
         case maintenance = "Maintenance"
+        case stats = "Stats"
         var id: Self { self }
     }
 
@@ -81,6 +82,8 @@ struct VehicleDetailView: View {
                     onLog: { isLoggingService = true },
                     onEdit: { editingServiceEntry = $0 }
                 )
+            case .stats:
+                FuelStatsSection(vehicle: vehicle)
             }
 
             Section {

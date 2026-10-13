@@ -25,6 +25,11 @@ enum Units {
         "\(value.formatted(.currency(code: "USD").precision(.fractionLength(3))))/gal"
     }
 
+    /// Fuel cost per mile, e.g. $0.117/mi.
+    static func costPerMile(_ value: Double) -> String {
+        "\(value.formatted(.currency(code: "USD").precision(.fractionLength(3))))/mi"
+    }
+
     static func mpg(_ value: Double) -> String {
         "\(value.formatted(.number.precision(.fractionLength(1)))) mpg"
     }
