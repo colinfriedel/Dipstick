@@ -22,6 +22,8 @@ final class Vehicle {
 
     @Relationship(deleteRule: .cascade, inverse: \MaintenanceEntry.vehicle)
     var maintenanceEntries: [MaintenanceEntry]? = []
+    @Relationship(deleteRule: .cascade, inverse: \Trip.vehicle)
+    var trips: [Trip]? = []
 
     init(
         name: String,

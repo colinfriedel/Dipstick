@@ -95,6 +95,9 @@ struct VehicleDetailView: View {
                 )
             case .stats:
                 FuelStatsSection(vehicle: vehicle)
+                #if DEBUG
+                TripTestingSection(vehicle: vehicle)
+                #endif
             }
 
             Section {
@@ -181,4 +184,5 @@ struct VehicleDetailView: View {
     container.mainContext.insert(vehicle)
     return NavigationStack { VehicleDetailView(vehicle: vehicle) }
         .modelContainer(container)
+        .environment(TripRecorder())
 }

@@ -10,12 +10,15 @@ import SwiftData
 
 @main
 struct DipstickApp: App {
+    @State private var tripRecorder = TripRecorder()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Vehicle.self,
             FuelEntry.self,
             MaintenanceEntry.self,
             PartUsed.self,
+            Trip.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -33,6 +36,7 @@ struct DipstickApp: App {
     var body: some Scene {
         WindowGroup {
             VehicleListView()
+                .environment(tripRecorder)
         }
         .modelContainer(sharedModelContainer)
     }

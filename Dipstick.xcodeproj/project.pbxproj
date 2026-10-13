@@ -374,6 +374,8 @@
 				DEVELOPMENT_TEAM = 7JB6DQH6B7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Dipstick-Info.plist";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Dipstick uses your location while recording a drive to measure how many miles were city and how many were highway. Only the totals are saved, never your route.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -406,6 +408,8 @@
 				DEVELOPMENT_TEAM = 7JB6DQH6B7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Dipstick-Info.plist";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Dipstick uses your location while recording a drive to measure how many miles were city and how many were highway. Only the totals are saved, never your route.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

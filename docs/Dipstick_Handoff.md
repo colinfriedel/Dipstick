@@ -241,3 +241,34 @@ junk (xcuserdata, DerivedData, .DS_Store). Work on a feature branch.
 Before coding, tell me your plan in a few bullets and ask any questions you have. As you
 go, briefly explain new concepts and what each file does, but keep it concise.
 ```
+
+---
+
+## Status (Oct 2026)
+
+Steps 1–6 are on `main`: vehicles, fuel log + MPG, maintenance log, due/overdue
+home screen, stats + charts, CSV import/export (format in `docs/csv-format.md`;
+personal data files live in the git-ignored `private/` folder). Free Apple
+account for now, so iCloud sync (step 7) waits until the app is "done".
+
+### In progress: automatic city/highway MPG (branch `feature/trips`)
+
+Goal: estimate city and highway MPG per car. Each tank's miles are split into
+city/highway from recorded drives; across many tanks, solve
+`gallons = cityMiles / cityMPG + highwayMiles / highwayMPG` (least squares),
+not a weighted average (that pulls both toward the overall MPG).
+
+- **Phase A (built, being road-tested):** `Trip` model (totals only, no
+  routes), `TripClassifier` (half-mile stretches; highway = avg ≥ 45 mph and
+  never < 25 mph), `TripRecorder` (CLLocationUpdate + background session, reads
+  the car audio route name), Debug-only "Trips (testing)" section on the Stats
+  tab with manual Start Trip. Waiting on real drives: highway % on a freeway
+  and a city drive, and the connection name each car reports.
+- **Phase B:** automatic drive detection (CoreMotion automotive + Always
+  location) and car assignment from the audio connection: RSX = JVC KW-560BT
+  CarPlay (USB), project car = Bluetooth, mom's 2019 Lexus ES300h = CarPlay (USB,
+  should go to review). Unrecognized/no connection → "Unreviewed" list
+  (assign / "Not my car", remembered per connection).
+- **Phase C:** per-tank highway % from trips between fill-ups, then city/highway
+  MPG estimate on the Stats tab once ~6–10 tanks with varied mixes exist. The
+  trips list itself is not meant for the final UI.
