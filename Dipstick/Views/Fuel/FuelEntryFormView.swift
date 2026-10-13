@@ -135,8 +135,8 @@ struct FuelEntryFormView: View {
                         .disabled(!canSave)
                 }
             }
-            .onAppear {
-                if !isEditing { focusedField = .odometer }
+            .task {
+                if !isEditing { await focusAfterPresentation { focusedField = .odometer } }
             }
         }
     }

@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import SwiftData
 
 /// Computes MPG between consecutive full-tank fill-ups.
 ///
@@ -55,6 +56,15 @@ enum MPGCalculator {
         return results
     }
 
+    /// MPG of the most recent full tank (by odometer) that has one.
+    static func latest<ID>(in fills: [Fill<ID>], results: [ID: Result]) -> Result? {
+        fills
+            .sorted { $0.odometer > $1.odometer }
+            .lazy
+            .compactMap { results[$0.id] }
+            .first
+    }
+
     /// Overall MPG across the given results: total miles / total gallons, so a
     /// long tank counts for more than a short one.
     static func average<S: Sequence>(of results: S) -> Double? where S.Element == Result {
@@ -65,5 +75,17 @@ enum MPGCalculator {
             gallons += result.gallons
         }
         return gallons > 0 ? Double(miles) / gallons : nil
+    }
+}
+
+extension Vehicle {
+    /// Last-tank and overall MPG, or nil until two full tanks are logged.
+    var mpgSummary: (latest: Double?, average: Double?) {
+        let fills = (fuelEntries ?? []).map(\.fill)
+        let results = MPGCalculator.results(for: fills)
+        return (
+            MPGCalculator.latest(in: fills, results: results)?.mpg,
+            MPGCalculator.average(of: results.values)
+        )
     }
 }

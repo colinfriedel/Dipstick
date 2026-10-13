@@ -33,6 +33,7 @@ struct MaintenanceHistorySection: View {
     var body: some View {
         let all = entries
         let shown = all.filter { $0.matches(query: query, typeFilter: typeFilter) }
+        let dueByEntry = Dictionary(uniqueKeysWithValues: vehicle.maintenanceDueItems().map { ($0.id, $0) })
 
         Section {
             Button("Log Service", systemImage: "wrench.and.screwdriver") {
@@ -74,7 +75,7 @@ struct MaintenanceHistorySection: View {
                     isSearching = false
                     onEdit(entry)
                 } label: {
-                    MaintenanceEntryRow(entry: entry)
+                    MaintenanceEntryRow(entry: entry, dueItem: dueByEntry[entry.persistentModelID])
                 }
                 .tint(.primary)
                 .swipeActions {
@@ -99,6 +100,9 @@ struct MaintenanceHistorySection: View {
 
 private struct MaintenanceEntryRow: View {
     let entry: MaintenanceEntry
+    /// Set only when this is the latest record of its service type and it has a
+    /// next-due; older records' due dates no longer apply.
+    let dueItem: MaintenanceDueCalculator.Item<PersistentIdentifier>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -127,10 +131,10 @@ private struct MaintenanceEntryRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            if let due = entry.due.summary {
-                Label("Next: \(due)", systemImage: "calendar.badge.clock")
+            if let dueItem, let due = dueItem.due.summary {
+                Label("Next: \(due) · \(dueItem.summary)", systemImage: dueItem.status.systemImage)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(dueItem.status.color)
             }
         }
     }

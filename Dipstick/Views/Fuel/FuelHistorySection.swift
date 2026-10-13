@@ -25,9 +25,13 @@ struct FuelHistorySection: View {
     }
 
     var body: some View {
-        let mpgResults = MPGCalculator.results(for: entries.map(\.fill))
+        let fills = entries.map(\.fill)
+        let mpgResults = MPGCalculator.results(for: fills)
 
         Section {
+            if let lastTank = MPGCalculator.latest(in: fills, results: mpgResults) {
+                LabeledContent("Last tank", value: Units.mpg(lastTank.mpg))
+            }
             if let average = MPGCalculator.average(of: mpgResults.values) {
                 LabeledContent("Average", value: Units.mpg(average))
             }

@@ -26,3 +26,11 @@ extension View {
             }
     }
 }
+
+/// Focuses a field once a sheet has finished sliding in. Focusing during the
+/// animation shows the keyboard without its toolbar (so no Done button).
+@MainActor
+func focusAfterPresentation(_ focus: () -> Void) async {
+    try? await Task.sleep(for: .milliseconds(450))
+    focus()
+}

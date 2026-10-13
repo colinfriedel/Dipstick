@@ -27,11 +27,22 @@ struct VehicleDetailView: View {
     @State private var isLoggingService = false
     @State private var editingServiceEntry: MaintenanceEntry?
     @State private var log: Log = .fuel
+    @State private var isUpdatingOdometer = false
 
     var body: some View {
         List {
             Section {
-                LabeledContent("Odometer", value: Units.miles(vehicle.currentOdometer))
+                Button { isUpdatingOdometer = true } label: {
+                    LabeledContent("Odometer") {
+                        HStack(spacing: 4) {
+                            Text(Units.miles(vehicle.currentOdometer))
+                            Image(systemName: "square.and.pencil")
+                                .foregroundStyle(.tint)
+                        }
+                    }
+                }
+                .tint(.primary)
+                .accessibilityHint("Update the odometer reading")
                 if let year = vehicle.year {
                     LabeledContent("Year", value: String(year))
                 }
@@ -84,6 +95,9 @@ struct VehicleDetailView: View {
         }
         .sheet(isPresented: $isEditing) {
             VehicleFormView(vehicle: vehicle)
+        }
+        .sheet(isPresented: $isUpdatingOdometer) {
+            OdometerUpdateView(vehicle: vehicle)
         }
         .sheet(isPresented: $isLoggingFuel) {
             FuelEntryFormView(vehicle: vehicle)

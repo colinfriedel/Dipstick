@@ -38,11 +38,13 @@ struct MaintenanceEntryFormView: View {
         var cost: String
     }
 
-    init(vehicle: Vehicle, entry: MaintenanceEntry? = nil) {
+    /// - Parameter serviceType: preselects the service when logging a new one
+    ///   (e.g. from a due item on the home screen).
+    init(vehicle: Vehicle, entry: MaintenanceEntry? = nil, serviceType: String? = nil) {
         self.vehicle = vehicle
         self.entry = entry
 
-        _serviceChoice = State(initialValue: entry?.serviceType ?? ServiceType.builtIn[0])
+        _serviceChoice = State(initialValue: entry?.serviceType ?? serviceType ?? ServiceType.builtIn[0])
         _customService = State(initialValue: "")
         _date = State(initialValue: entry?.date ?? Date())
         _odometer = State(initialValue: String(entry?.odometer ?? vehicle.currentOdometer))
