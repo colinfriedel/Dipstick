@@ -131,6 +131,16 @@ final class TripRecorder {
             .map { "\($0.portName) (\(label(for: $0.portType)))" }
     }
 
+    #if DEBUG
+    /// Debug-only: every current audio output with its type and unique ID, to
+    /// see whether two CarPlay cars can be told apart (both report "CarPlay").
+    static func audioRouteDetails() -> [String] {
+        AVAudioSession.sharedInstance().currentRoute.outputs.map {
+            "\($0.portName) · \($0.portType.rawValue)\nID: \($0.uid)"
+        }
+    }
+    #endif
+
     private static func label(for port: AVAudioSession.Port) -> String {
         switch port {
         case .carAudio: "CarPlay"

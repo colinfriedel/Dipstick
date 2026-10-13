@@ -105,6 +105,24 @@ struct TripRecordingView: View {
                 Section("Car connection") {
                     Text(recorder.connectionName ?? "None detected")
                 }
+
+                Section {
+                    TimelineView(.periodic(from: .now, by: 2)) { _ in
+                        let outputs = TripRecorder.audioRouteDetails()
+                        if outputs.isEmpty {
+                            Text("No audio output").foregroundStyle(.secondary)
+                        }
+                        ForEach(outputs, id: \.self) { output in
+                            Text(output)
+                                .font(.caption.monospaced())
+                                .textSelection(.enabled)
+                        }
+                    }
+                } header: {
+                    Text("Audio route details")
+                } footer: {
+                    Text("Compare the ID in each CarPlay car. Long-press to copy.")
+                }
             }
             .navigationTitle("Recording")
             .navigationBarTitleDisplayMode(.inline)
