@@ -39,7 +39,7 @@ struct FuelHistorySection: View {
 
             ForEach(entries) { entry in
                 Button { onEdit(entry) } label: {
-                    FuelEntryRow(entry: entry, mpg: mpgResults[entry.persistentModelID]?.mpg)
+                    FuelEntryRow(entry: entry, result: mpgResults[entry.persistentModelID])
                 }
                 .tint(.primary)
                 .swipeActions {
@@ -60,40 +60,56 @@ struct FuelHistorySection: View {
 
 private struct FuelEntryRow: View {
     let entry: FuelEntry
-    let mpg: Double?
+    let result: MPGCalculator.Result?
+
+    /// Miles driven on this tank (since the previous full tank), the same
+    /// distance its MPG is based on.
+    private var tankMiles: String? {
+        result.map { "\($0.miles.formatted()) mi" }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(entry.date, format: .dateTime.month(.abbreviated).day().year())
                     .font(.headline)
-                Spacer()
-                if let mpg {
-                    Text(Units.mpg(mpg))
-                        .font(.headline)
-                        .monospacedDigit()
-                }
-            }
-            HStack {
-                Text(Units.gallons(entry.gallons))
-                Text("·")
-                Text(entry.isCostKnown ? Units.currency(entry.totalCost) : "cost —")
-                if let price = entry.pricePerGallon {
-                    Text("·")
-                    Text(Units.pricePerGallon(price))
-                }
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
 
-            HStack {
-                Text(Units.miles(entry.odometer))
-                if !entry.isFullTank {
-                    Text("· Partial fill, not used for MPG")
+                HStack {
+                    Text(Units.gallons(entry.gallons))
+                    Text("·")
+                    Text(entry.isCostKnown ? Units.currency(entry.totalCost) : "cost —")
+                    if let price = entry.pricePerGallon {
+                        Text("·")
+                        Text(Units.pricePerGallon(price))
+                    }
                 }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+                HStack {
+                    Text(Units.miles(entry.odometer))
+                    if !entry.isFullTank {
+                        Text("· Partial fill, not used for MPG")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+
+            Spacer()
+
+            if let result {
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(Units.mpg(result.mpg))
+                        .font(.headline)
+                    if let tankMiles {
+                        Text(tankMiles)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .monospacedDigit()
+            }
         }
     }
 }
