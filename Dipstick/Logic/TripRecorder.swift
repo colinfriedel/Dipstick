@@ -41,7 +41,15 @@ struct CarConnection: Equatable {
 @Observable
 @MainActor
 final class TripRecorder {
-    static let shared = TripRecorder()
+    /// On first use, saves any trip left behind by an interrupted recording
+    /// (see `TripCheckpoint`).
+    static let shared: TripRecorder = {
+        let recorder = TripRecorder()
+        if let checkpoint = TripCheckpoint.read() {
+            checkpoint.recover(into: DipstickApp.modelContainer.mainContext)
+        }
+        return recorder
+    }()
 
     /// Rules for ending a trip that was started automatically.
     enum AutoStop {
@@ -88,6 +96,7 @@ final class TripRecorder {
     /// The trip's car connection is currently missing (checked every 15 s).
     private(set) var connectionLost = false
     private var isAutomatic = false
+    private var lastCheckpoint = Date.distantPast
 
     /// The car seems to be off: an automatic trip whose connection is gone or
     /// whose Stop Trip ran. Slow movement (walking away) isn't counted then,
@@ -240,7 +249,24 @@ final class TripRecorder {
         currentMPH = nil
     }
 
+    private func writeCheckpoint() {
+        guard let startDate else { return }
+        lastCheckpoint = Date()
+        TripCheckpoint(
+            startDate: startDate,
+            vehicleID: vehicle?.persistentModelID,
+            connectionName: connection?.name,
+            connectionID: connection?.id,
+            // Not driving yet counts as "moving" so a short checkpoint isn't
+            // trimmed to nothing.
+            lastMoving: isEnding ? lastMoving : Date(),
+            samples: samples
+        ).write()
+    }
+
     private func stopUpdates() {
+        TripCheckpoint.delete()
+        lastCheckpoint = .distantPast
         updatesTask?.cancel()
         updatesTask = nil
         watchdogTask?.cancel()
@@ -292,6 +318,9 @@ final class TripRecorder {
             return
         }
         samples.append(sample)
+        if sample.timestamp.timeIntervalSince(lastCheckpoint) >= TripCheckpoint.interval {
+            writeCheckpoint()
+        }
         // Re-classifying the whole drive is cheap (a few thousand samples) and
         // keeps the live numbers identical to what will be saved.
         if samples.count % 5 == 0 {

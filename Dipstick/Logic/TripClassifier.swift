@@ -26,7 +26,7 @@ enum TripClassifier {
     /// time still counts, so a red light still makes a stretch city driving.
     static let stoppedMPH = 1.0
 
-    struct Sample: Equatable {
+    struct Sample: Equatable, Codable {
         let timestamp: Date
         let latitude: Double
         let longitude: Double
