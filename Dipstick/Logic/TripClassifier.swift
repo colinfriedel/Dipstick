@@ -22,6 +22,9 @@ enum TripClassifier {
     /// Gaps longer than this (GPS dropout, tunnel) aren't bridged with a
     /// straight line; the distance across them is skipped.
     static let maxGapSeconds = 30.0
+    /// Below this the car is standing still; GPS jitter isn't distance. The
+    /// time still counts, so a red light still makes a stretch city driving.
+    static let stoppedMPH = 1.0
 
     struct Sample: Equatable {
         let timestamp: Date
@@ -79,7 +82,7 @@ enum TripClassifier {
             let reported = current.speed >= 0 ? current.speed * mphPerMetersPerSecond : nil
             let mph = reported ?? miles / (seconds / 3_600)
 
-            stretchMiles += miles
+            stretchMiles += mph < stoppedMPH ? 0 : miles
             stretchSeconds += seconds
             stretchMinMPH = min(stretchMinMPH, mph)
             if stretchMiles >= segmentMiles {

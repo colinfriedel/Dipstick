@@ -79,10 +79,23 @@ final class TripRecorder {
     var connectionName: String? { connection?.name }
 
     private var samples: [TripClassifier.Sample] = []
-    /// Last time the car was going at least `AutoStop.movingMPH`.
-    private var lastMoving = Date()
+    /// Last time the car was going at least `AutoStop.movingMPH` (two
+    /// readings in a row, so one noisy GPS fix while walking doesn't count).
+    private(set) var lastMoving = Date()
+    private var fastReadingsInARow = 0
     /// Stop Trip ran (e.g. "CarPlay disconnects"); end once parked.
-    private var stopRequested = false
+    private(set) var stopRequested = false
+    /// The trip's car connection is currently missing (checked every 15 s).
+    private(set) var connectionLost = false
+    private var isAutomatic = false
+
+    /// The car seems to be off: an automatic trip whose connection is gone or
+    /// whose Stop Trip ran. Slow movement (walking away) isn't counted then,
+    /// and the trip ends once parked for `AutoStop.parkedSeconds`.
+    var isEnding: Bool { isAutomatic && (stopRequested || connectionLost) }
+
+    /// When an ending trip will save if you stay parked.
+    var endsAt: Date? { isEnding ? lastMoving + AutoStop.parkedSeconds : nil }
     private var updatesTask: Task<Void, Never>?
     private var watchdogTask: Task<Void, Never>?
     private var backgroundSession: CLBackgroundActivitySession?
@@ -157,7 +170,10 @@ final class TripRecorder {
             }
         }
         lastMoving = Date()
+        fastReadingsInARow = 0
         stopRequested = false
+        connectionLost = false
+        isAutomatic = automatic
         if automatic {
             startAutoStopWatchdog()
         }
@@ -169,6 +185,7 @@ final class TripRecorder {
     func requestStopWhenParked() {
         guard isRecording else { return }
         stopRequested = true
+        isAutomatic = true
         if watchdogTask == nil { startAutoStopWatchdog() }
     }
 
@@ -191,6 +208,9 @@ final class TripRecorder {
             self.vehicle = nil
             samples = []
             currentMPH = nil
+            isAutomatic = false
+            stopRequested = false
+            connectionLost = false
         }
         guard final.totalMiles >= 0.1 else { return nil }
 
@@ -211,6 +231,9 @@ final class TripRecorder {
 
     func discard() {
         stopUpdates()
+        isAutomatic = false
+        stopRequested = false
+        connectionLost = false
         startDate = nil
         vehicle = nil
         samples = []
@@ -236,6 +259,7 @@ final class TripRecorder {
                 guard let self, self.isRecording else { return }
                 let current = CarConnection.current()
                 let present = current != nil && (self.connection == nil || current?.id == self.connection?.id)
+                self.connectionLost = !present
                 if present {
                     self.stopRequested = false
                     if self.connection == nil { self.connection = current }
@@ -254,12 +278,20 @@ final class TripRecorder {
 
     private func add(_ location: CLLocation) {
         let sample = TripClassifier.Sample(location)
-        samples.append(sample)
-        if sample.speed >= 0 {
-            let mph = sample.speed * TripClassifier.mphPerMetersPerSecond
+        let mph = sample.speed >= 0 ? sample.speed * TripClassifier.mphPerMetersPerSecond : nil
+        if let mph {
             currentMPH = mph
-            if mph >= AutoStop.movingMPH { lastMoving = sample.timestamp }
+            let accurate = sample.horizontalAccuracy >= 0
+                && sample.horizontalAccuracy <= TripClassifier.maxHorizontalAccuracyMeters
+            fastReadingsInARow = (mph >= AutoStop.movingMPH && accurate) ? fastReadingsInARow + 1 : 0
+            if fastReadingsInARow >= 2 { lastMoving = sample.timestamp }
         }
+        // With the car off, only count driving speeds: walking away from the
+        // car or shuffling around a parking lot isn't the car's mileage.
+        if isEnding, (mph ?? 0) < AutoStop.movingMPH {
+            return
+        }
+        samples.append(sample)
         // Re-classifying the whole drive is cheap (a few thousand samples) and
         // keeps the live numbers identical to what will be saved.
         if samples.count % 5 == 0 {

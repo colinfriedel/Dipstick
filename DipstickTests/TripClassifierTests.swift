@@ -93,6 +93,16 @@ struct TripClassifierTests {
         #expect(isClose(split.totalMiles, 2.0))
     }
 
+    @Test func gpsDriftWhileStoppedAddsNoMiles() {
+        // Five minutes parked: speed 0, position wobbling ~5 m each second.
+        let start = Date(timeIntervalSince1970: 1_790_000_000)
+        let samples = (0..<300).map { i in
+            Sample(timestamp: start + Double(i), latitude: 37 + (i % 2 == 0 ? 0 : 0.000045),
+                   longitude: -122, speed: 0, horizontalAccuracy: 8)
+        }
+        #expect(TripClassifier.classify(samples).totalMiles == 0)
+    }
+
     @Test func emptyOrSingleSampleHasNoMiles() {
         #expect(TripClassifier.classify([]).totalMiles == 0)
         #expect(TripClassifier.classify(Array(drive([(1, 30)]).prefix(1))).totalMiles == 0)

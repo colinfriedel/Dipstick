@@ -49,7 +49,7 @@ def classify(rows, avg_mph, min_mph, segment=0.5, max_accuracy=50.0, max_gap=30.
             continue
         speed = float(r["speed_mph"])
         mph = speed if speed >= 0 else step / (dt / 3600)
-        miles += step
+        miles += step if mph >= 1.0 else 0  # TripClassifier.stoppedMPH
         seconds += dt
         low = min(low, mph)
         if miles >= segment:

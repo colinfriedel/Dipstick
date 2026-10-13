@@ -211,9 +211,35 @@ struct TripRecordingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    @ViewBuilder
+    private func endingStatus(at now: Date) -> some View {
+        if let mph = recorder.currentMPH, mph >= TripRecorder.AutoStop.movingMPH {
+            Label("Car disconnected · still driving, recording", systemImage: "car.fill")
+        } else if let endsAt = recorder.endsAt {
+            let remaining = max(0, endsAt.timeIntervalSince(now))
+            Label(
+                remaining > 0
+                    ? "Parked · saving in \(Duration.seconds(remaining).formatted(.time(pattern: .minuteSecond)))"
+                    : "Parked · saving now…",
+                systemImage: "parkingsign.circle"
+            )
+            .monospacedDigit()
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
+                if recorder.isEnding {
+                    Section {
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            endingStatus(at: context.date)
+                        }
+                    } footer: {
+                        Text("The car connection is gone or Stop Trip ran. Driving speeds keep the trip going (in case the head unit just rebooted); otherwise it saves after \(Int(TripRecorder.AutoStop.parkedSeconds / 60)) minutes parked. Walking isn't counted.")
+                    }
+                }
+
                 Section {
                     LabeledContent("Speed") {
                         Text(recorder.currentMPH.map { "\(Int($0.rounded())) mph" } ?? "Waiting for GPS…")
