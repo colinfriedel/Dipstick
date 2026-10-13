@@ -12,7 +12,7 @@ import SwiftData
 struct DipstickApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Vehicle.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -25,7 +25,7 @@ struct DipstickApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            VehicleListView()
         }
         .modelContainer(sharedModelContainer)
     }
