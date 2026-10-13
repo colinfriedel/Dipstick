@@ -14,6 +14,8 @@ struct DipstickApp: App {
         let schema = Schema([
             Vehicle.self,
             FuelEntry.self,
+            MaintenanceEntry.self,
+            PartUsed.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

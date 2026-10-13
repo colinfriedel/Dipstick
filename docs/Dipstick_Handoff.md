@@ -205,6 +205,13 @@ Get to step 6 as fast as possible — real use will surface what's actually miss
 - Local notifications for due maintenance.
 - CSV export.
 - Home-screen widget showing next due service.
+- **Import the maintenance schedule from the owner's manual**, for any car: most manuals
+  are online as PDFs or other formats. The app reads the schedule and sets up the
+  service types and intervals, then tracks due dates from there (fits the existing
+  interval-based "next due" and custom service types). Open questions: on-device PDF
+  parsing vs. a hosted service (the app has no backend), manuals that list both
+  "normal" and "severe" schedules, and letting the user review before anything is
+  saved.
 
 ## 10. How I want to work
 

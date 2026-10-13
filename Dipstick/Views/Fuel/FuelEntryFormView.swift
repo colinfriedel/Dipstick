@@ -123,6 +123,7 @@ struct FuelEntryFormView: View {
                     TextField("Notes", text: $notes, axis: .vertical)
                 }
             }
+            .keyboardDoneButton()
             .navigationTitle(isEditing ? "Edit Fill-Up" : "Log Fill-Up")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

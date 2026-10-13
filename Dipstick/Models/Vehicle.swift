@@ -20,7 +20,8 @@ final class Vehicle {
     @Relationship(deleteRule: .cascade, inverse: \FuelEntry.vehicle)
     var fuelEntries: [FuelEntry]? = []
 
-    // maintenanceEntries relationship is added in build step 3.
+    @Relationship(deleteRule: .cascade, inverse: \MaintenanceEntry.vehicle)
+    var maintenanceEntries: [MaintenanceEntry]? = []
 
     init(
         name: String,

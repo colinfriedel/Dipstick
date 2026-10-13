@@ -95,6 +95,7 @@ struct VehicleFormView: View {
                     }
                 }
             }
+            .keyboardDoneButton()
             .navigationTitle(isEditing ? "Edit Vehicle" : "New Vehicle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

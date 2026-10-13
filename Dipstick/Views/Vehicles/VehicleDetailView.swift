@@ -6,9 +6,16 @@
 import SwiftUI
 import SwiftData
 
-/// One vehicle's details and fuel log. Maintenance and Stats sections arrive in later steps.
+/// One vehicle's details, with a switch between its fuel and maintenance logs.
+/// A Stats tab arrives in a later step.
 struct VehicleDetailView: View {
     let vehicle: Vehicle
+
+    enum Log: String, CaseIterable, Identifiable {
+        case fuel = "Fuel"
+        case maintenance = "Maintenance"
+        var id: Self { self }
+    }
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -17,6 +24,9 @@ struct VehicleDetailView: View {
     @State private var vehicleToDelete: Vehicle?
     @State private var isLoggingFuel = false
     @State private var editingFuelEntry: FuelEntry?
+    @State private var isLoggingService = false
+    @State private var editingServiceEntry: MaintenanceEntry?
+    @State private var log: Log = .fuel
 
     var body: some View {
         List {
@@ -39,11 +49,28 @@ struct VehicleDetailView: View {
                 }
             }
 
-            FuelHistorySection(
-                vehicle: vehicle,
-                onLog: { isLoggingFuel = true },
-                onEdit: { editingFuelEntry = $0 }
-            )
+            Picker("Log", selection: $log) {
+                ForEach(Log.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
+
+            switch log {
+            case .fuel:
+                FuelHistorySection(
+                    vehicle: vehicle,
+                    onLog: { isLoggingFuel = true },
+                    onEdit: { editingFuelEntry = $0 }
+                )
+            case .maintenance:
+                MaintenanceHistorySection(
+                    vehicle: vehicle,
+                    onLog: { isLoggingService = true },
+                    onEdit: { editingServiceEntry = $0 }
+                )
+            }
 
             Section {
                 Button("Delete Vehicle", role: .destructive) {
@@ -63,6 +90,12 @@ struct VehicleDetailView: View {
         }
         .sheet(item: $editingFuelEntry) { entry in
             FuelEntryFormView(vehicle: vehicle, entry: entry)
+        }
+        .sheet(isPresented: $isLoggingService) {
+            MaintenanceEntryFormView(vehicle: vehicle)
+        }
+        .sheet(item: $editingServiceEntry) { entry in
+            MaintenanceEntryFormView(vehicle: vehicle, entry: entry)
         }
         .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in
             dismiss()

@@ -6,7 +6,7 @@
 import SwiftUI
 import SwiftData
 
-/// Home screen: every vehicle. Swipe right to log a fill-up, left to delete.
+/// Home screen: every vehicle. Swipe right to log a fill-up or service, left to delete.
 struct VehicleListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Vehicle.name) private var vehicles: [Vehicle]
@@ -14,6 +14,7 @@ struct VehicleListView: View {
     @State private var isAdding = false
     @State private var vehicleToDelete: Vehicle?
     @State private var vehicleToFuel: Vehicle?
+    @State private var vehicleToService: Vehicle?
 
     var body: some View {
         NavigationStack {
@@ -27,6 +28,10 @@ struct VehicleListView: View {
                             vehicleToFuel = vehicle
                         }
                         .tint(.green)
+                        Button("Log Service", systemImage: "wrench.and.screwdriver") {
+                            vehicleToService = vehicle
+                        }
+                        .tint(.orange)
                     }
                     .swipeActions(edge: .trailing) {
                         Button("Delete", role: .destructive) {
@@ -61,6 +66,9 @@ struct VehicleListView: View {
             }
             .sheet(item: $vehicleToFuel) { vehicle in
                 FuelEntryFormView(vehicle: vehicle)
+            }
+            .sheet(item: $vehicleToService) { vehicle in
+                MaintenanceEntryFormView(vehicle: vehicle)
             }
             .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in
                 modelContext.delete(vehicle)
