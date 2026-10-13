@@ -6,7 +6,7 @@
 import SwiftUI
 import SwiftData
 
-/// One vehicle's details. Fuel, Maintenance and Stats sections arrive in later steps.
+/// One vehicle's details and fuel log. Maintenance and Stats sections arrive in later steps.
 struct VehicleDetailView: View {
     let vehicle: Vehicle
 
@@ -15,11 +15,13 @@ struct VehicleDetailView: View {
 
     @State private var isEditing = false
     @State private var vehicleToDelete: Vehicle?
+    @State private var isLoggingFuel = false
+    @State private var editingFuelEntry: FuelEntry?
 
     var body: some View {
         List {
             Section {
-                LabeledContent("Odometer", value: "\(vehicle.currentOdometer.formatted()) mi")
+                LabeledContent("Odometer", value: Units.miles(vehicle.currentOdometer))
                 if let year = vehicle.year {
                     LabeledContent("Year", value: String(year))
                 }
@@ -37,6 +39,12 @@ struct VehicleDetailView: View {
                 }
             }
 
+            FuelHistorySection(
+                vehicle: vehicle,
+                onLog: { isLoggingFuel = true },
+                onEdit: { editingFuelEntry = $0 }
+            )
+
             Section {
                 Button("Delete Vehicle", role: .destructive) {
                     vehicleToDelete = vehicle
@@ -49,6 +57,12 @@ struct VehicleDetailView: View {
         }
         .sheet(isPresented: $isEditing) {
             VehicleFormView(vehicle: vehicle)
+        }
+        .sheet(isPresented: $isLoggingFuel) {
+            FuelEntryFormView(vehicle: vehicle)
+        }
+        .sheet(item: $editingFuelEntry) { entry in
+            FuelEntryFormView(vehicle: vehicle, entry: entry)
         }
         .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in
             dismiss()

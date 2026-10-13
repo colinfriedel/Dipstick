@@ -17,7 +17,10 @@ final class Vehicle {
     var vin: String?
     var currentOdometer: Int = 0
 
-    // fuelEntries and maintenanceEntries relationships are added in build steps 2 and 3.
+    @Relationship(deleteRule: .cascade, inverse: \FuelEntry.vehicle)
+    var fuelEntries: [FuelEntry]? = []
+
+    // maintenanceEntries relationship is added in build step 3.
 
     init(
         name: String,
@@ -33,6 +36,14 @@ final class Vehicle {
         self.model = model
         self.vin = vin
         self.currentOdometer = currentOdometer
+    }
+
+    /// Raise the odometer if a newly logged reading is higher. Never lowers it,
+    /// so deleting or backfilling an old entry doesn't move it backwards.
+    func recordOdometer(_ reading: Int) {
+        if reading > currentOdometer {
+            currentOdometer = reading
+        }
     }
 
     /// "2014 Mazda Miata", built from whichever of year/make/model are set.

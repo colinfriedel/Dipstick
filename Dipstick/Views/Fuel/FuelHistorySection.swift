@@ -1,0 +1,95 @@
+//
+//  FuelHistorySection.swift
+//  Dipstick
+//
+
+import SwiftUI
+import SwiftData
+
+/// Fuel part of the vehicle detail list: average MPG, a log button, and every
+/// fill-up newest first. Tap a row to edit it, swipe to delete.
+///
+/// The parent presents the log/edit sheets: a `.sheet` attached to a `Section`
+/// is copied onto every row, and the copies fight over presenting.
+struct FuelHistorySection: View {
+    let vehicle: Vehicle
+    let onLog: () -> Void
+    let onEdit: (FuelEntry) -> Void
+
+    @Environment(\.modelContext) private var modelContext
+
+    private var entries: [FuelEntry] {
+        (vehicle.fuelEntries ?? []).sorted {
+            ($0.date, $0.odometer) > ($1.date, $1.odometer)
+        }
+    }
+
+    var body: some View {
+        let mpgResults = MPGCalculator.results(for: entries.map(\.fill))
+
+        Section {
+            if let average = MPGCalculator.average(of: mpgResults.values) {
+                LabeledContent("Average", value: Units.mpg(average))
+            }
+            Button("Log Fill-Up", systemImage: "fuelpump", action: onLog)
+
+            ForEach(entries) { entry in
+                Button { onEdit(entry) } label: {
+                    FuelEntryRow(entry: entry, mpg: mpgResults[entry.persistentModelID]?.mpg)
+                }
+                .tint(.primary)
+                .swipeActions {
+                    Button("Delete", role: .destructive) {
+                        modelContext.delete(entry)
+                    }
+                }
+            }
+        } header: {
+            Text("Fuel")
+        } footer: {
+            if entries.isEmpty {
+                Text("No fill-ups yet. MPG appears once you've logged two full tanks.")
+            }
+        }
+    }
+}
+
+private struct FuelEntryRow: View {
+    let entry: FuelEntry
+    let mpg: Double?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(entry.date, format: .dateTime.month(.abbreviated).day().year())
+                    .font(.headline)
+                Spacer()
+                if let mpg {
+                    Text(Units.mpg(mpg))
+                        .font(.headline)
+                        .monospacedDigit()
+                }
+            }
+            HStack {
+                Text(Units.gallons(entry.gallons))
+                Text("·")
+                Text(Units.currency(entry.totalCost))
+                if let price = entry.pricePerGallon {
+                    Text("·")
+                    Text(Units.pricePerGallon(price))
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+
+            HStack {
+                Text(Units.miles(entry.odometer))
+                if !entry.isFullTank {
+                    Text("· Partial fill, not used for MPG")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+}

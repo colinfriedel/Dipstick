@@ -32,6 +32,29 @@ struct VehicleTests {
         #expect(try context.fetchCount(FetchDescriptor<Vehicle>()) == 1)
     }
 
+    @Test func deletingVehicleDeletesItsFuelEntries() throws {
+        let context = try makeContext()
+        let vehicle = Vehicle(name: "Daily Driver")
+        context.insert(vehicle)
+        let entry = FuelEntry(odometer: 1_000, gallons: 10, totalCost: 35)
+        context.insert(entry)
+        entry.vehicle = vehicle
+        try context.save()
+        #expect(vehicle.fuelEntries?.count == 1)
+
+        context.delete(vehicle)
+        try context.save()
+        #expect(try context.fetchCount(FetchDescriptor<FuelEntry>()) == 0)
+    }
+
+    @Test func recordOdometerOnlyMovesForward() {
+        let vehicle = Vehicle(name: "A", currentOdometer: 50_000)
+        vehicle.recordOdometer(49_000)
+        #expect(vehicle.currentOdometer == 50_000)
+        vehicle.recordOdometer(50_350)
+        #expect(vehicle.currentOdometer == 50_350)
+    }
+
     @Test func yearMakeModelSkipsMissingParts() {
         #expect(Vehicle(name: "A", year: 1994, make: "Mazda", model: "Miata").yearMakeModel == "1994 Mazda Miata")
         #expect(Vehicle(name: "B", make: "Mazda").yearMakeModel == "Mazda")

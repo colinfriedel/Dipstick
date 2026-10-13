@@ -13,6 +13,7 @@ struct DipstickApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Vehicle.self,
+            FuelEntry.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
