@@ -23,6 +23,9 @@ struct FuelEntryFormView: View {
     @State private var station: String
     @State private var notes: String
 
+    @State private var isScanning = false
+    @State private var filledFromScan = false
+
     private enum Field { case odometer, gallons, totalCost }
     @FocusState private var focusedField: Field?
 
@@ -41,6 +44,17 @@ struct FuelEntryFormView: View {
     }
 
     private var isEditing: Bool { entry != nil }
+
+    /// Average price of this car's last few fill-ups with a known cost, used to
+    /// sanity-check a scanned reading.
+    private var recentPricePerGallon: Double? {
+        let recent = (vehicle.fuelEntries ?? [])
+            .filter(\.isCostKnown)
+            .sorted { $0.date > $1.date }
+            .prefix(5)
+        let gallons = recent.reduce(0) { $0 + $1.gallons }
+        return gallons > 0 ? recent.reduce(0) { $0 + $1.totalCost } / gallons : nil
+    }
 
     // MARK: Parsed values and validation
 
@@ -97,6 +111,9 @@ struct FuelEntryFormView: View {
                 }
 
                 Section {
+                    if !isEditing {
+                        Button("Scan Pump", systemImage: "camera.viewfinder") { isScanning = true }
+                    }
                     LabeledContent("Gallons") {
                         TextField("0.000", text: $gallons)
                             .keyboardType(.decimalPad)
@@ -115,6 +132,9 @@ struct FuelEntryFormView: View {
                     Toggle("Filled the tank", isOn: $isFullTank)
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
+                        if filledFromScan {
+                            Label("Filled from the pump screen. Check before saving.", systemImage: "camera.viewfinder")
+                        }
                         if totalCost.trimmingCharacters(in: .whitespaces).isEmpty {
                             Text("Don't know the cost? Leave it blank; spend stats will skip this fill-up.")
                         }
@@ -140,6 +160,13 @@ struct FuelEntryFormView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
                         .disabled(!canSave)
+                }
+            }
+            .fullScreenCover(isPresented: $isScanning) {
+                PumpScannerView(expectedPrice: recentPricePerGallon) { reading in
+                    gallons = String(format: "%.3f", reading.gallons)
+                    totalCost = String(format: "%.2f", reading.total)
+                    filledFromScan = true
                 }
             }
             .task {
