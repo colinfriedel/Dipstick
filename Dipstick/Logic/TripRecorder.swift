@@ -59,18 +59,24 @@ final class TripRecorder {
         /// Not moving this long, with the car connection gone or Stop Trip
         /// requested, ends the trip. Long enough for a red light.
         static let parkedSeconds: TimeInterval = 180
+        /// Before the car has driven at all (warming up, connections still
+        /// settling), wait this long instead, so the trip isn't ended before
+        /// the drive starts.
+        static let notYetDrivenSeconds: TimeInterval = 600
 
         /// True once the trip should end. Losing the connection alone never
         /// ends a trip (head units reboot mid-drive); you also have to stop
-        /// moving.
+        /// moving. `lastMoving` is the trip start until it has driven.
         static func shouldStop(
             now: Date,
             lastMoving: Date,
+            hasDriven: Bool = true,
             connectionPresent: Bool,
             stopRequested: Bool
         ) -> Bool {
             guard !connectionPresent || stopRequested else { return false }
-            return now.timeIntervalSince(lastMoving) >= parkedSeconds
+            let wait = hasDriven ? parkedSeconds : notYetDrivenSeconds
+            return now.timeIntervalSince(lastMoving) >= wait
         }
     }
 
@@ -90,6 +96,8 @@ final class TripRecorder {
     /// Last time the car was going at least `AutoStop.movingMPH` (two
     /// readings in a row, so one noisy GPS fix while walking doesn't count).
     private(set) var lastMoving = Date()
+    /// Whether the trip has reached driving speed yet.
+    private(set) var hasDriven = false
     private var fastReadingsInARow = 0
     /// Stop Trip ran (e.g. "CarPlay disconnects"); end once parked.
     private(set) var stopRequested = false
@@ -104,7 +112,10 @@ final class TripRecorder {
     var isEnding: Bool { isAutomatic && (stopRequested || connectionLost) }
 
     /// When an ending trip will save if you stay parked.
-    var endsAt: Date? { isEnding ? lastMoving + AutoStop.parkedSeconds : nil }
+    var endsAt: Date? {
+        guard isEnding else { return nil }
+        return lastMoving + (hasDriven ? AutoStop.parkedSeconds : AutoStop.notYetDrivenSeconds)
+    }
     private var updatesTask: Task<Void, Never>?
     private var watchdogTask: Task<Void, Never>?
     private var backgroundSession: CLBackgroundActivitySession?
@@ -179,6 +190,7 @@ final class TripRecorder {
             }
         }
         lastMoving = Date()
+        hasDriven = false
         fastReadingsInARow = 0
         stopRequested = false
         connectionLost = false
@@ -223,19 +235,10 @@ final class TripRecorder {
         }
         guard final.totalMiles >= 0.1 else { return nil }
 
-        let trip = Trip(
-            startDate: startDate, endDate: Date(),
-            cityMiles: final.cityMiles, highwayMiles: final.highwayMiles,
-            status: vehicle == nil ? .unreviewed : .assigned,
-            connectionName: connection?.name,
-            connectionID: connection?.id
+        return Trip.save(
+            start: startDate, end: trimAfter ?? Date(), split: final,
+            vehicle: vehicle, connection: connection, in: context
         )
-        context.insert(trip)
-        trip.vehicle = vehicle
-        // Save now: a trip stopped in the background may be suspended before
-        // SwiftData's autosave runs.
-        try? context.save()
-        return trip
     }
 
     func discard() {
@@ -283,17 +286,21 @@ final class TripRecorder {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(15))
                 guard let self, self.isRecording else { return }
+                let context = DipstickApp.modelContainer.mainContext
                 let current = CarConnection.current()
-                let present = current != nil && (self.connection == nil || current?.id == self.connection?.id)
-                self.connectionLost = !present
-                if present {
-                    self.stopRequested = false
-                    if self.connection == nil { self.connection = current }
-                    if self.vehicle == nil {
-                        self.vehicle = Vehicle.matching(current, in: DipstickApp.modelContainer.mainContext)
-                    }
+                // An unrecognized trip picks up its car as soon as any of that
+                // car's connections appears (e.g. Bluetooth first, CarPlay later).
+                if self.vehicle == nil, let match = Vehicle.matching(current, in: context) {
+                    self.vehicle = match
                 }
-                if AutoStop.shouldStop(now: Date(), lastMoving: self.lastMoving,
+                if self.connection == nil { self.connection = current }
+                // Still "in the car" if connected to the trip's connection or to
+                // any connection of the trip's car.
+                let present = current != nil
+                    && (current?.id == self.connection?.id || self.vehicle?.knowsConnection(current?.id) == true)
+                self.connectionLost = !present
+                if present { self.stopRequested = false }
+                if AutoStop.shouldStop(now: Date(), lastMoving: self.lastMoving, hasDriven: self.hasDriven,
                                        connectionPresent: present, stopRequested: self.stopRequested) {
                     self.stop(into: DipstickApp.modelContainer.mainContext, trimAfter: self.lastMoving)
                     return
@@ -310,7 +317,10 @@ final class TripRecorder {
             let accurate = sample.horizontalAccuracy >= 0
                 && sample.horizontalAccuracy <= TripClassifier.maxHorizontalAccuracyMeters
             fastReadingsInARow = (mph >= AutoStop.movingMPH && accurate) ? fastReadingsInARow + 1 : 0
-            if fastReadingsInARow >= 2 { lastMoving = sample.timestamp }
+            if fastReadingsInARow >= 2 {
+                lastMoving = sample.timestamp
+                hasDriven = true
+            }
         }
         // With the car off, only count driving speeds: walking away from the
         // car or shuffling around a parking lot isn't the car's mileage.
@@ -339,13 +349,4 @@ final class TripRecorder {
         }
     }
     #endif
-}
-
-extension Vehicle {
-    /// The vehicle whose saved car connection matches `connection`, if any.
-    static func matching(_ connection: CarConnection?, in context: ModelContext) -> Vehicle? {
-        guard let id = connection?.id else { return nil }
-        let vehicles = (try? context.fetch(FetchDescriptor<Vehicle>())) ?? []
-        return vehicles.first { $0.connectionID == id }
-    }
 }

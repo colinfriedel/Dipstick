@@ -84,28 +84,35 @@ private struct AutomaticTripsSection: View {
                     .foregroundStyle(.secondary)
             }
 
-            LabeledContent("Car connection") {
-                VStack(alignment: .trailing) {
-                    Text(vehicle.connectionName ?? "Not set")
-                    if let id = vehicle.connectionID {
-                        Text(id).font(.caption.monospaced()).foregroundStyle(.secondary)
+            ForEach(vehicle.connections, id: \.id) { connection in
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(connection.name)
+                        Text(connection.id).font(.caption.monospaced()).foregroundStyle(.secondary)
                     }
+                    Spacer()
+                    Button("Remove", systemImage: "minus.circle.fill", role: .destructive) {
+                        vehicle.removeConnection(id: connection.id)
+                        message = nil
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.red)
                 }
             }
-            Button("Use Current Connection", systemImage: "link") {
+            if vehicle.connections.isEmpty {
+                Text("No connections yet").foregroundStyle(.secondary)
+            }
+            Button("Add Current Connection", systemImage: "link") {
                 if let connection = CarConnection.current() {
-                    vehicle.connectionID = connection.id
-                    vehicle.connectionName = connection.name
-                    message = "Linked to \(connection.name)."
+                    if vehicle.knowsConnection(connection.id) {
+                        message = "\(connection.name) is already linked."
+                    } else {
+                        vehicle.addConnection(connection)
+                        message = "Linked \(connection.name)."
+                    }
                 } else {
                     message = "Not connected to CarPlay or Bluetooth right now."
-                }
-            }
-            if vehicle.connectionID != nil {
-                Button("Unlink Connection", role: .destructive) {
-                    vehicle.connectionID = nil
-                    vehicle.connectionName = nil
-                    message = nil
                 }
             }
             if let message {
@@ -114,7 +121,7 @@ private struct AutomaticTripsSection: View {
         } header: {
             Text("Automatic trips (testing)")
         } footer: {
-            Text("Connect to this car, then tap Use Current Connection. Trips started by the Start Trip shortcut while connected to it are assigned to \(vehicle.name) automatically.")
+            Text("Connect to this car, then tap Add Current Connection. A car can have several (e.g. Bluetooth and CarPlay). Trips on any of them are assigned to \(vehicle.name) automatically.")
         }
         .onChange(of: scenePhase) {
             if scenePhase == .active { recorder.refreshAuthorization() }
@@ -174,9 +181,8 @@ struct UnassignedTripsSection: View {
     private func assign(_ trip: Trip, to vehicle: Vehicle) {
         trip.vehicle = vehicle
         trip.status = .assigned
-        if vehicle.connectionID == nil, let id = trip.connectionID {
-            vehicle.connectionID = id
-            vehicle.connectionName = trip.connectionName
+        if let id = trip.connectionID {
+            vehicle.addConnection(CarConnection(name: trip.connectionName ?? id, id: id))
         }
     }
 }

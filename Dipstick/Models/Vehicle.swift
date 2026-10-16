@@ -16,8 +16,13 @@ final class Vehicle {
     var model: String?
     var vin: String?
     var currentOdometer: Int = 0
-    /// The car's CarPlay/Bluetooth connection (`CarConnection.id`), so trips
-    /// started by connecting to it are assigned automatically.
+    /// Every CarPlay/Bluetooth connection known to belong to this car, one per
+    /// line as "id<TAB>name" (plain text so CloudKit can sync it). Use
+    /// `connections` / `addConnection` instead. A car can have several, e.g.
+    /// Bluetooth that connects first and CarPlay a moment later.
+    var knownConnections: String = ""
+    /// Single connection from before cars could have several; folded into
+    /// `connections` and cleared when a connection is next added or removed.
     var connectionID: String?
     var connectionName: String?
 

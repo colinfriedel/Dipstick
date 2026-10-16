@@ -54,17 +54,10 @@ struct TripCheckpoint: Codable {
         guard split.totalMiles >= 0.1 else { return nil }
 
         let vehicle = vehicleID.flatMap { context.model(for: $0) as? Vehicle }
-        let trip = Trip(
-            startDate: startDate,
-            endDate: kept.last?.timestamp ?? startDate,
-            cityMiles: split.cityMiles, highwayMiles: split.highwayMiles,
-            status: vehicle == nil ? .unreviewed : .assigned,
-            connectionName: connectionName,
-            connectionID: connectionID
+        let connection = connectionID.map { CarConnection(name: connectionName ?? $0, id: $0) }
+        return Trip.save(
+            start: startDate, end: kept.last?.timestamp ?? startDate, split: split,
+            vehicle: vehicle, connection: connection, in: context
         )
-        context.insert(trip)
-        trip.vehicle = vehicle
-        try? context.save()
-        return trip
     }
 }
