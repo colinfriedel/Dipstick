@@ -205,6 +205,14 @@ Get to step 6 as fast as possible — real use will surface what's actually miss
 - Local notifications for due maintenance.
 - CSV export.
 - Home-screen widget showing next due service.
+- **Live odometer estimate from recorded trips** (optional toggle): add recorded
+  trip miles to the last known odometer reading so the home screen tracks the
+  odometer between fill-ups. Can't be exact (GPS vs. odometer differ ~1–3%,
+  plus unrecorded drives), so calibrate a per-car correction factor from each
+  tank (trip miles vs. odometer difference between fill-ups), always label it
+  "(est.)", and snap back to the real reading whenever a fill-up, service or
+  odometer update is logged. Could also drive mileage-based due-soon reminders
+  mid-tank.
 - **Import the maintenance schedule from the owner's manual**, for any car: most manuals
   are online as PDFs or other formats. The app reads the schedule and sets up the
   service types and intervals, then tracks due dates from there (fits the existing

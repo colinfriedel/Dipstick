@@ -118,6 +118,20 @@ struct MaintenanceDueTests {
         #expect(result.map(\.id) == ["late", "soonest", "soon", "ok"])
     }
 
+    @Test func shortSummaryAndDueLabel() {
+        let overdueByDate = items([record("a", dueDate: date(2020, 8, 8))]).first
+        #expect(overdueByDate?.shortSummary == "6 yr overdue")
+        #expect(overdueByDate?.dueLabel.hasPrefix("Due Aug") == true)
+        #expect(overdueByDate?.lastDone == date(2026, 4, 12))
+
+        let soonByMiles = items([record("a", dueMiles: 50_298)]).first
+        #expect(soonByMiles?.shortSummary == "298 mi left")
+        #expect(soonByMiles?.dueLabel == "Due 50,298 mi")
+
+        #expect(Calc.Item<String>.span(days: 75) == "2 mo")
+        #expect(Calc.Item<String>.span(days: 12) == "12 days")
+    }
+
     @Test func noRecordsMeansNothingDue() {
         #expect(items([]).isEmpty)
     }

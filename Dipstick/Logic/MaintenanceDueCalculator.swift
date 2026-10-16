@@ -37,6 +37,8 @@ enum MaintenanceDueCalculator {
         let milesLeft: Int?
         let daysLeft: Int?
         let status: Status
+        /// When the latest record of this service was done.
+        let lastDone: Date
 
         /// How much of the due-soon window is left (lower = more urgent), using
         /// whichever of miles or days is closer.
@@ -48,10 +50,43 @@ enum MaintenanceDueCalculator {
         }
 
         /// Whether the miles side is the more urgent one (for the summary text).
-        private var milesAreMoreUrgent: Bool {
+        var milesAreMoreUrgent: Bool {
             guard let milesLeft else { return false }
             guard let daysLeft else { return true }
             return Double(milesLeft) / Double(soonMiles) <= Double(daysLeft) / Double(soonDays)
+        }
+
+        /// Short form for status lines: "6 yr overdue", "298 mi left", "12 days left".
+        var shortSummary: String {
+            if milesAreMoreUrgent, let milesLeft {
+                if milesLeft < 0 { return "\((-milesLeft).formatted()) mi overdue" }
+                if milesLeft == 0 { return "due now" }
+                return "\(milesLeft.formatted()) mi left"
+            }
+            guard let daysLeft else { return "" }
+            if daysLeft == 0 { return "due today" }
+            return "\(Self.span(days: abs(daysLeft))) \(daysLeft < 0 ? "overdue" : "left")"
+        }
+
+        /// "Due Aug 2020" or "Due 56,798 mi", whichever drives the status.
+        var dueLabel: String {
+            if milesAreMoreUrgent, let odometer = due.odometer {
+                return "Due \(odometer.formatted()) mi"
+            }
+            if let date = due.date {
+                return "Due \(date.formatted(.dateTime.month(.abbreviated).year()))"
+            }
+            return due.odometer.map { "Due \($0.formatted()) mi" } ?? ""
+        }
+
+        /// 2260 days → "6 yr", 75 → "2 mo", 1 → "1 day".
+        static func span(days: Int) -> String {
+            switch days {
+            case 365...: "\(days / 365) yr"
+            case 30...: "\(days / 30) mo"
+            case 1: "1 day"
+            default: "\(days) days"
+            }
         }
 
         /// "overdue by 320 mi", "due in 12 days", "due today".
@@ -103,7 +138,8 @@ enum MaintenanceDueCalculator {
             )
             return Item(
                 id: record.id, serviceType: record.serviceType, due: record.due,
-                milesLeft: milesLeft, daysLeft: daysLeft, status: status
+                milesLeft: milesLeft, daysLeft: daysLeft, status: status,
+                lastDone: record.date
             )
         }
         .sorted { ($0.status, -$0.urgency) > ($1.status, -$1.urgency) }

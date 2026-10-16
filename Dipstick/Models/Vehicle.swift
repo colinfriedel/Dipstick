@@ -16,6 +16,10 @@ final class Vehicle {
     var model: String?
     var vin: String?
     var currentOdometer: Int = 0
+    /// Chip color as "#RRGGBB"; nil shows a neutral chip.
+    var colorHex: String?
+    /// Optional paint name, e.g. "Redondo Red Pearl".
+    var colorName: String?
     /// Every CarPlay/Bluetooth connection known to belong to this car, one per
     /// line as "id<TAB>name" (plain text so CloudKit can sync it). Use
     /// `connections` / `addConnection` instead. A car can have several, e.g.

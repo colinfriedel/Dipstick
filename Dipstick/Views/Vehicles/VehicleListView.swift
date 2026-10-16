@@ -6,9 +6,10 @@
 import SwiftUI
 import SwiftData
 
-/// Home screen: services due soon or overdue across all vehicles, then every
-/// vehicle with its latest MPG and next service. Swipe a vehicle right to log a
-/// fill-up or service, left to delete.
+/// Home screen (design board C1a / M): a card per car with its last-tank MPG
+/// gauge, due count and odometer, then the "service lamps" list of everything
+/// due soon or overdue. Tap a card for its details; the pump button logs a
+/// fill-up. Swipe a card right to log a fill-up or service, left to delete.
 struct VehicleListView: View {
     /// A request to log a service, optionally for a specific service type.
     struct ServiceRequest: Identifiable {
@@ -17,8 +18,8 @@ struct VehicleListView: View {
         var serviceType: String?
     }
 
-    /// One due/overdue service on one vehicle, for the Due section.
-    private struct DueRow: Identifiable {
+    /// One due/overdue service on one vehicle, for the service lamps list.
+    struct DueRow: Identifiable {
         let vehicle: Vehicle
         let item: MaintenanceDueCalculator.Item<PersistentIdentifier>
         var id: PersistentIdentifier { item.id }
@@ -27,12 +28,17 @@ struct VehicleListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Vehicle.name) private var vehicles: [Vehicle]
 
+    @State private var path: [Vehicle] = []
     @State private var isAdding = false
     @State private var vehicleToDelete: Vehicle?
     @State private var vehicleToFuel: Vehicle?
     @State private var serviceRequest: ServiceRequest?
+    #if DEBUG
+    @Query(filter: #Predicate<Trip> { $0.vehicle == nil }) private var unassignedTrips: [Trip]
+    @State private var isShowingUnassigned = false
+    #endif
 
-    /// Everything due soon or overdue, most urgent first across all vehicles.
+    /// Everything due soon or overdue, most overdue first across all vehicles.
     private var dueRows: [DueRow] {
         vehicles
             .flatMap { vehicle in
@@ -44,136 +50,281 @@ struct VehicleListView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
-                let due = dueRows
-                if !due.isEmpty {
-                    Section("Due") {
-                        ForEach(due) { row in
-                            Button {
-                                serviceRequest = ServiceRequest(vehicle: row.vehicle, serviceType: row.item.serviceType)
-                            } label: {
-                                DueItemRow(vehicleName: row.vehicle.name, item: row.item)
-                            }
-                            .tint(.primary)
-                        }
-                    }
-                }
+                header
+                    .homeRow(top: 4, bottom: 10)
 
-                #if DEBUG
-                UnassignedTripsSection()
-                #endif
-
-                Section {
+                if vehicles.isEmpty {
+                    emptyState.homeRow()
+                } else {
+                    SmallCapsLabel("Vehicles").homeRow(top: 0, bottom: 4)
                     ForEach(vehicles) { vehicle in
-                        NavigationLink(value: vehicle) {
-                            VehicleRow(vehicle: vehicle)
+                        VehicleCard(vehicle: vehicle) {
+                            vehicleToFuel = vehicle
                         }
+                        .contentShape(Rectangle())
+                        .onTapGesture { path.append(vehicle) }
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction { path.append(vehicle) }
+                        .homeRow()
                         .swipeActions(edge: .leading) {
-                            Button("Log Fill-Up", systemImage: "fuelpump") {
-                                vehicleToFuel = vehicle
-                            }
-                            .tint(.green)
+                            Button("Log Fill-Up", systemImage: "fuelpump") { vehicleToFuel = vehicle }
+                                .tint(Theme.accent)
                             Button("Log Service", systemImage: "wrench.and.screwdriver") {
                                 serviceRequest = ServiceRequest(vehicle: vehicle)
                             }
-                            .tint(.orange)
+                            .tint(Theme.amber)
                         }
                         .swipeActions(edge: .trailing) {
-                            Button("Delete", role: .destructive) {
-                                vehicleToDelete = vehicle
-                            }
+                            Button("Delete", role: .destructive) { vehicleToDelete = vehicle }
                         }
                     }
-                } header: {
-                    if !due.isEmpty { Text("Vehicles") }
-                }
-            }
-            .overlay {
-                if vehicles.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Vehicles", systemImage: "car")
-                    } description: {
-                        Text("Add a car to start logging fuel and maintenance.")
-                    } actions: {
-                        Button("Add Vehicle") { isAdding = true }
-                            .buttonStyle(.borderedProminent)
+
+                    let due = dueRows
+                    SectionTitle("Service lamps") {
+                        SmallCapsLabel("\(due.count) active")
                     }
+                    .homeRow(top: 16, bottom: 4)
+                    ServiceLampsPanel(rows: due) { row in
+                        serviceRequest = ServiceRequest(vehicle: row.vehicle, serviceType: row.item.serviceType)
+                    }
+                    .homeRow()
                 }
+
+                #if DEBUG
+                if !unassignedTrips.isEmpty {
+                    DebugDashedRow(title: "Unassigned trips (testing) · \(unassignedTrips.count)") {
+                        isShowingUnassigned = true
+                    }
+                    .homeRow(top: 18)
+                }
+                #endif
             }
-            .navigationTitle("Dipstick")
+            .listStyle(.plain)
+            .environment(\.defaultMinListRowHeight, 1)
+            .scrollContentBackground(.hidden)
+            .background(Theme.ground)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Vehicle.self) { vehicle in
                 VehicleDetailView(vehicle: vehicle)
-            }
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Add Vehicle", systemImage: "plus") { isAdding = true }
-                }
             }
             .sheet(isPresented: $isAdding) {
                 VehicleFormView()
             }
             .sheet(item: $vehicleToFuel) { vehicle in
+                // Step 4 of the design spec replaces this with the pump scanner.
                 FuelEntryFormView(vehicle: vehicle)
             }
             .sheet(item: $serviceRequest) { request in
                 MaintenanceEntryFormView(vehicle: request.vehicle, serviceType: request.serviceType)
             }
+            #if DEBUG
+            .sheet(isPresented: $isShowingUnassigned) {
+                NavigationStack {
+                    List { UnassignedTripsSection() }
+                        .navigationTitle("Unassigned Trips")
+                        .navigationBarTitleDisplayMode(.inline)
+                }
+            }
+            #endif
             .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in
                 modelContext.delete(vehicle)
             }
         }
+        .tint(Theme.accent)
+    }
+
+    private var header: some View {
+        HStack {
+            Text("DIPSTICK")
+                .font(.dipstick(24, .semibold, relativeTo: .largeTitle))
+                .tracking(4)
+                .foregroundStyle(Theme.text)
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            Button { isAdding = true } label: {
+                Image(systemName: "plus").font(.system(size: 18, weight: .medium))
+            }
+            .buttonStyle(SmallControlButtonStyle(foreground: Theme.accent))
+            .accessibilityLabel("Add vehicle")
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            MPGGauge(mpg: nil, size: 96)
+            Text("No vehicles yet")
+                .font(.dipstick(18, .semibold, relativeTo: .headline))
+                .foregroundStyle(Theme.text)
+            Text("Add a car to start logging fuel and maintenance.")
+                .font(.dipstick(14, relativeTo: .subheadline))
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+            Button("Add vehicle") { isAdding = true }
+                .buttonStyle(PrimaryButtonStyle())
+        }
+        .padding(.top, 60)
     }
 }
 
-private struct VehicleRow: View {
+/// One car on Home: gauge, name with due count, model line, odometer, and the
+/// icon-only fill-up button.
+private struct VehicleCard: View {
     let vehicle: Vehicle
+    let onFillUp: () -> Void
 
     var body: some View {
-        let lastTank = vehicle.mpgSummary.latest
-        let nextService = vehicle.maintenanceDueItems().first
+        let dueCount = vehicle.maintenanceDueItems().filter { $0.status != .ok }.count
 
-        VStack(alignment: .leading, spacing: 2) {
-            Text(vehicle.name)
-                .font(.headline)
-            if !vehicle.yearMakeModel.isEmpty {
-                Text(vehicle.yearMakeModel)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        HStack(spacing: 12) {
+            MPGGauge(mpg: vehicle.mpgSummary.latest, size: 84)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 7) {
+                    vehicle.chip
+                    Text(vehicle.name.uppercased())
+                        .font(.dipstick(17, .semibold, relativeTo: .headline))
+                        .tracking(2)
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(1)
+                    if dueCount > 0 {
+                        CountPill(count: dueCount)
+                    }
+                }
+                if !vehicle.yearMakeModel.isEmpty {
+                    Text(vehicle.yearMakeModel)
+                        .font(.dipstick(13, relativeTo: .footnote))
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                }
+                OdometerView(miles: vehicle.currentOdometer, size: 22)
+                    .padding(.top, 3)
             }
-            Text([Units.miles(vehicle.currentOdometer), lastTank.map { "\(Units.mpg($0)) last tank" }]
-                .compactMap { $0 }
-                .joined(separator: " · "))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if let nextService {
-                Text("Next: \(nextService.serviceType), \(nextService.summary)")
-                    .font(.caption)
-                    .foregroundStyle(nextService.status.color)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(action: onFillUp) {
+                Image(systemName: "fuelpump")
+                    .font(.system(size: 30, weight: .light))
+                    .frame(width: 68, height: 68)
+                    .background(RoundedRectangle(cornerRadius: Theme.Radius.button).fill(Theme.controlFill))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.button)
+                        .strokeBorder(Theme.controlBorder, lineWidth: 1.5))
+                    .foregroundStyle(Theme.text)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Log fill-up for \(vehicle.name)")
+        }
+        .padding(12)
+        .frame(minHeight: 108)
+        .panel()
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// The "service lamps" list: due-soon and overdue services across all cars.
+private struct ServiceLampsPanel: View {
+    let rows: [VehicleListView.DueRow]
+    let onSelect: (VehicleListView.DueRow) -> Void
+
+    var body: some View {
+        if rows.isEmpty {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.circle")
+                    .foregroundStyle(Theme.muted)
+                Text("Nothing due")
+                    .font(.dipstick(15, relativeTo: .body))
+                    .foregroundStyle(Theme.muted)
+                Spacer()
+            }
+            .padding(16)
+            .panel()
+        } else {
+            PanelList(rows) { row in
+                Button { onSelect(row) } label: { ServiceLampRow(row: row) }
+                    .buttonStyle(.borderless)
+                    .accessibilityHint("Logs this service")
             }
         }
     }
 }
 
-private struct DueItemRow: View {
-    let vehicleName: String
-    let item: MaintenanceDueCalculator.Item<PersistentIdentifier>
+private struct ServiceLampRow: View {
+    let row: VehicleListView.DueRow
 
     var body: some View {
+        let item = row.item
         HStack(spacing: 12) {
-            Image(systemName: item.status.systemImage)
-                .foregroundStyle(item.status.color)
-                .font(.title3)
-            VStack(alignment: .leading, spacing: 2) {
+            Image(systemName: item.status.icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(item.status.tint)
+                .frame(width: 30, height: 30)
+                .background(RoundedRectangle(cornerRadius: 8).fill(item.status.tint.opacity(0.14)))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(item.status.tint.opacity(0.3), lineWidth: 1))
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(item.serviceType)
-                    .font(.headline)
-                Text("\(vehicleName) · \(item.summary)")
-                    .font(.subheadline)
-                    .foregroundStyle(item.status.color)
+                    .font(.dipstick(15, .semibold, relativeTo: .body))
+                    .foregroundStyle(Theme.text)
+                HStack(spacing: 5) {
+                    CarChip(colorHex: row.vehicle.colorHex, size: 8)
+                    Text("\(row.vehicle.name) · Last done \(item.lastDone.formatted(.dateTime.month(.abbreviated).year()))".uppercased())
+                        .font(.dipstick(10, .semibold, relativeTo: .caption2))
+                        .tracking(1)
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(item.shortSummary.uppercased())
+                    .font(.readout(12, relativeTo: .caption))
+                    .foregroundStyle(item.status.tint)
+                Text(item.dueLabel.uppercased())
+                    .font(.readout(10, relativeTo: .caption2))
+                    .foregroundStyle(Theme.muted)
             }
         }
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Logs this service")
+    }
+}
+
+/// A dashed, out-of-the-way row for Debug-only tools.
+struct DebugDashedRow: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Text(title)
+                    .font(.dipstick(13, relativeTo: .footnote))
+                    .foregroundStyle(Theme.muted)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.faint)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 48)
+            .overlay(RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(Theme.panelBorder, style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderless)
+    }
+}
+
+private extension View {
+    /// A full-width Home row: no list background, separator or default insets.
+    func homeRow(top: CGFloat = 5, bottom: CGFloat = 5) -> some View {
+        listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: top, leading: 16, bottom: bottom, trailing: 16))
     }
 }
 
