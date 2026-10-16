@@ -29,10 +29,10 @@ My maintenance records were spread across paper notebooks and iPhone Notes, and 
 **In testing**
 - **Automatic trip recording**: drives start and stop on their own when the phone connects to the car (CarPlay or Bluetooth, via Shortcuts automations), and each car is recognized by its connection
 - **City/highway split**: GPS speed is used to classify each half-mile of a drive as city or highway. Only mile totals are saved, never the route
+- **City, highway and combined MPG**: once a tank's drives are recorded, city and highway MPG are solved across all tracked tanks from each tank's mix and gallons. The estimate gets more accurate as tanks with different mixes add up
 - **Pump scanning**: point the camera at the pump's screen to fill in gallons and total. Text is read on-device and no photo is saved
 
 **Planned**
-- City and highway MPG estimates per car, solved from each tank's city/highway mix
 - iCloud sync
 - Importing maintenance schedules from owner's manuals
 - Visual redesign
