@@ -17,7 +17,10 @@ enum SampleData {
     static func seedIfRequested(into context: ModelContext) {
         guard ProcessInfo.processInfo.arguments.contains(launchArgument) else { return }
         let existing = (try? context.fetch(FetchDescriptor<Vehicle>())) ?? []
-        guard !existing.contains(where: { $0.name == "Sample Car" }) else { return }
+        if let sample = existing.first(where: { $0.name == "Sample Car" }) {
+            addSampleTrips(to: sample, in: context)
+            return
+        }
 
         let vehicle = Vehicle(name: "Sample Car", year: 2019, make: "Honda", model: "Civic", currentOdometer: 0)
         context.insert(vehicle)
@@ -45,6 +48,26 @@ enum SampleData {
             date = calendar.date(byAdding: .day, value: Int.random(in: 9...16, using: &generator), to: date)!
         }
         vehicle.recordOdometer(odometer)
+        addSampleTrips(to: vehicle, in: context)
+    }
+
+    /// Recorded trips covering the last six full tanks (~95% of their miles)
+    /// with varied city/highway mixes, for the City & highway section.
+    @MainActor
+    private static func addSampleTrips(to vehicle: Vehicle, in context: ModelContext) {
+        guard (vehicle.trips ?? []).isEmpty else { return }
+        let fulls = (vehicle.fuelEntries ?? []).filter(\.isFullTank).sorted { $0.odometer < $1.odometer }
+        let mixes = [0.15, 0.6, 0.35, 0.8, 0.25, 0.5]
+        for (pair, mix) in zip(zip(fulls.dropLast(), fulls.dropFirst()).suffix(6), mixes) {
+            let (from, to) = pair
+            let miles = Double(to.odometer - from.odometer) * 0.95
+            let trip = Trip(
+                startDate: from.date + 3_600, endDate: to.date - 3_600,
+                cityMiles: miles * (1 - mix), highwayMiles: miles * mix, status: .assigned
+            )
+            context.insert(trip)
+            trip.vehicle = vehicle
+        }
     }
 }
 

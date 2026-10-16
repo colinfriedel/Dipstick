@@ -7,8 +7,9 @@ import SwiftUI
 import SwiftData
 import Charts
 
-/// Stats tab of the vehicle detail list: MPG summary and trend chart, then fuel
-/// spend and a monthly spend chart.
+/// Stats tab of the vehicle detail list: MPG summary and trend chart, city and
+/// highway MPG (for cars with recorded trips), then fuel spend and a monthly
+/// spend chart.
 struct FuelStatsSection: View {
     let vehicle: Vehicle
 
@@ -39,6 +40,10 @@ struct FuelStatsSection: View {
                 }
                 .padding(.vertical, 8)
             }
+        }
+
+        if !(vehicle.trips ?? []).isEmpty {
+            CityHighwaySection(vehicle: vehicle)
         }
 
         Section {
@@ -176,5 +181,52 @@ private struct MonthlySpendChart: View {
             }
         }
         .accessibilityLabel("Fuel spend per month, last 12 months")
+    }
+}
+
+/// City, highway and combined MPG from fully recorded tanks, plus how much of
+/// the current tank has been recorded so far.
+private struct CityHighwaySection: View {
+    let vehicle: Vehicle
+
+    var body: some View {
+        let estimate = CityHighwayMPG.estimate(from: vehicle.trackedTanks)
+
+        Section {
+            if let estimate {
+                LabeledContent("City", value: Units.mpg(estimate.cityMPG))
+                LabeledContent("Highway", value: Units.mpg(estimate.highwayMPG))
+                LabeledContent("Combined", value: Units.mpg(estimate.combinedMPG))
+            } else {
+                Text("Record every drive on a tank to see city and highway MPG.")
+                    .foregroundStyle(.secondary)
+            }
+            if let current = vehicle.currentTankRecording {
+                LabeledContent("Current tank") {
+                    VStack(alignment: .trailing) {
+                        Text("\(current.recordedMiles.formatted(.number.precision(.fractionLength(0)))) mi recorded")
+                        if let fraction = current.highwayFraction {
+                            Text("\(fraction.formatted(.percent.precision(.fractionLength(0)))) highway")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text("City & highway")
+        } footer: {
+            if let estimate {
+                let tanks = "\(estimate.tankCount) tracked tank\(estimate.tankCount == 1 ? "" : "s")"
+                let mix = "\(estimate.highwayShare.formatted(.percent.precision(.fractionLength(0)))) highway overall"
+                if estimate.isRough {
+                    Text("Rough estimate from \(tanks) (\(mix)). City and highway get more accurate as you log tanks with different mixes, like a road trip or an all-city week. Combined is measured.")
+                } else {
+                    Text("Based on \(tanks) (\(mix)). Combined is measured from those tanks.")
+                }
+            } else if let current = vehicle.currentTankRecording {
+                Text("A tank counts once recorded trips cover at least \(CityHighwayMPG.minimumCoverage.formatted(.percent)) of its miles. This tank started \(current.since.formatted(date: .abbreviated, time: .omitted)); log your next fill-up at the pump.")
+            }
+        }
     }
 }
