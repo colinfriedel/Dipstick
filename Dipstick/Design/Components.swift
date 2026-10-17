@@ -331,13 +331,14 @@ struct StatusLine: View {
     let text: String
 
     var body: some View {
-        Label {
-            Text(text)
-        } icon: {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
             Image(systemName: status.icon)
+                .font(.system(size: 11, weight: .semibold))
+            Text(text)
         }
         .font(.dipstick(12, .semibold, relativeTo: .caption))
         .foregroundStyle(status.tint)
+        .accessibilityElement(children: .combine)
     }
 }
 

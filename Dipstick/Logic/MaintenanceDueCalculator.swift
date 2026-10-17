@@ -79,6 +79,11 @@ enum MaintenanceDueCalculator {
             return due.odometer.map { "Due \($0.formatted()) mi" } ?? ""
         }
 
+        /// "Next 56,798 mi" or "Next Aug 2020".
+        var nextLabel: String {
+            "Next" + dueLabel.dropFirst("Due".count)
+        }
+
         /// 2260 days → "6 yr", 75 → "2 mo", 1 → "1 day".
         static func span(days: Int) -> String {
             switch days {

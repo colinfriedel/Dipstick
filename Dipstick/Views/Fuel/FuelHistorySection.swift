@@ -92,6 +92,7 @@ private struct FuelEntryRow: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.date, format: .dateTime.month(.abbreviated).day().year())
+                    .multilineTextAlignment(.leading)
                     .font(.dipstick(15, .semibold, relativeTo: .body))
                     .foregroundStyle(Theme.text)
 

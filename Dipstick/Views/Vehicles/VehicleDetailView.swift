@@ -103,10 +103,10 @@ struct VehicleDetailView: View {
         .fullScreenCover(item: $editingFuelEntry) { entry in
             FillUpFlowView(vehicle: vehicle, entry: entry)
         }
-        .sheet(isPresented: $isLoggingService) {
+        .fullScreenCover(isPresented: $isLoggingService) {
             MaintenanceEntryFormView(vehicle: vehicle)
         }
-        .sheet(item: $editingServiceEntry) { entry in
+        .fullScreenCover(item: $editingServiceEntry) { entry in
             MaintenanceEntryFormView(vehicle: vehicle, entry: entry)
         }
         .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in

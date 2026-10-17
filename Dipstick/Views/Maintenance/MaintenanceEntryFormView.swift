@@ -6,8 +6,9 @@
 import SwiftUI
 import SwiftData
 
-/// Sheet for logging a service (pass no entry) or editing one. Works for DIY
-/// jobs (cost adds up the parts) and shop visits (type the bill's total).
+/// Log or edit a service (design board J). Works for DIY jobs (the total adds
+/// up the parts) and shop visits (type the bill's total). For a new service
+/// the odometer starts empty: enter what the car shows.
 struct MaintenanceEntryFormView: View {
     let vehicle: Vehicle
     let entry: MaintenanceEntry?
@@ -29,8 +30,15 @@ struct MaintenanceEntryFormView: View {
     @State private var everyMonths: String
     @State private var lastPrefill = MaintenanceSchedule.Interval()
     @State private var notes: String
+    @State private var isPickingDate = false
 
-    private static let otherChoice = "Other…"
+    @FocusState private var odometerFocused: Bool
+    @FocusState private var costFocused: Bool
+    @FocusState private var milesFocused: Bool
+    @FocusState private var monthsFocused: Bool
+    @FocusState private var focusedPart: PartField?
+
+    private static let customChoice = "Custom…"
 
     struct PartDraft: Identifiable {
         let id = UUID()
@@ -38,8 +46,12 @@ struct MaintenanceEntryFormView: View {
         var cost: String
     }
 
+    enum PartField: Hashable {
+        case name(UUID), cost(UUID)
+    }
+
     /// - Parameter serviceType: preselects the service when logging a new one
-    ///   (e.g. from a due item on the home screen).
+    ///   (e.g. from a service lamp on Home).
     init(vehicle: Vehicle, entry: MaintenanceEntry? = nil, serviceType: String? = nil) {
         self.vehicle = vehicle
         self.entry = entry
@@ -47,7 +59,7 @@ struct MaintenanceEntryFormView: View {
         _serviceChoice = State(initialValue: entry?.serviceType ?? serviceType ?? ServiceType.builtIn[0])
         _customService = State(initialValue: "")
         _date = State(initialValue: entry?.date ?? Date())
-        _odometer = State(initialValue: String(entry?.odometer ?? vehicle.currentOdometer))
+        _odometer = State(initialValue: entry.map { String($0.odometer) } ?? "")
         _notes = State(initialValue: entry?.notes ?? "")
 
         let existingParts = entry?.sortedParts ?? []
@@ -72,12 +84,22 @@ struct MaintenanceEntryFormView: View {
 
     // MARK: Service type
 
+    /// This car's services first (most recent first), then the rest of the
+    /// built-in and custom names, then Custom….
     private var serviceOptions: [String] {
-        ServiceType.options(addingUsed: allEntries.map(\.serviceType)) + [Self.otherChoice]
+        var seen = Set<String>()
+        let mine = (vehicle.maintenanceEntries ?? []).sorted { $0.date > $1.date }.map(\.serviceType)
+        let all = mine + ServiceType.options(addingUsed: allEntries.map(\.serviceType))
+        var options = all.filter { seen.insert($0.lowercased()).inserted }
+        if !options.contains(where: { $0.caseInsensitiveCompare(serviceChoice) == .orderedSame }),
+           serviceChoice != Self.customChoice {
+            options.insert(serviceChoice, at: 0)
+        }
+        return options + [Self.customChoice]
     }
 
     private var resolvedServiceType: String {
-        serviceChoice == Self.otherChoice
+        serviceChoice == Self.customChoice
             ? customService.trimmingCharacters(in: .whitespacesAndNewlines)
             : serviceChoice
     }
@@ -127,136 +149,243 @@ struct MaintenanceEntryFormView: View {
             && interval != nil && partsAreValid
     }
 
+    private var isKeyboardUp: Bool {
+        odometerFocused || costFocused || milesFocused || monthsFocused || focusedPart != nil
+    }
+
     // MARK: Body
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Picker("Service", selection: $serviceChoice) {
-                        ForEach(serviceOptions, id: \.self) { Text($0).tag($0) }
-                    }
-                    .pickerStyle(.navigationLink)
-                    if serviceChoice == Self.otherChoice {
-                        TextField("Service name", text: $customService)
-                            .textInputAutocapitalization(.sentences)
-                    }
-                    DatePicker("Date", selection: $date, displayedComponents: .date)
-                    LabeledContent("Odometer") {
-                        TextField("Miles", text: $odometer)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                    }
-                } footer: {
-                    odometerMessage
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                FormHeader(title: isEditing ? "Edit service" : "Log service", vehicle: vehicle) { dismiss() }
+                    .padding(.bottom, 6)
+
+                SmallCapsLabel("Service")
+                serviceChips
+                if serviceChoice == Self.customChoice {
+                    TextField("Service name", text: $customService,
+                              prompt: Text("Service name").foregroundStyle(Theme.faint))
+                        .font(.dipstick(16, relativeTo: .body))
+                        .foregroundStyle(Theme.text)
+                        .textInputAutocapitalization(.sentences)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 52)
+                        .panel(radius: Theme.Radius.field)
                 }
 
-                Section("Parts") {
-                    ForEach($parts) { $part in
-                        HStack {
-                            TextField("Part name", text: $part.name)
-                            TextField("$0.00", text: $part.cost)
-                                .keyboardType(.decimalPad)
-                                .multilineTextAlignment(.trailing)
-                                .frame(maxWidth: 100)
-                        }
-                    }
-                    .onDelete { parts.remove(atOffsets: $0) }
-                    Button("Add Part", systemImage: "plus") {
-                        parts.append(PartDraft(name: "", cost: ""))
-                    }
+                OdometerField(text: $odometer, focus: $odometerFocused, size: 24)
+                    .padding(.top, 4)
+
+                HStack(spacing: 10) {
+                    dateTile
+                    NumberTileField(label: "Total cost", text: costText, placeholder: "$0.00",
+                                    prefix: "$", size: 24, focus: $costFocused)
+                }
+                if isPickingDate {
+                    DatePicker("Date", selection: $date, in: ...Date.now.addingTimeInterval(86_400),
+                               displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .labelsHidden()
+                        .padding(8)
+                        .panel(radius: Theme.Radius.field)
                 }
 
-                Section {
-                    LabeledContent("Total cost") {
-                        TextField("$0.00", text: costText)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                    }
-                } footer: {
-                    costMessage
+                SectionTitle("Parts used") {
+                    Text(manualCost == nil ? "Total adds up from parts" : "Total typed in")
+                        .font(.dipstick(11.5, relativeTo: .caption))
+                        .foregroundStyle(Theme.muted)
+                }
+                .padding(.top, 6)
+                partsPanel
+                if manualCost != nil, partsTotal > 0 {
+                    Button("Parts add up to \(Units.currency(partsTotal)). Use parts total") { manualCost = nil }
+                        .font(.dipstick(12, relativeTo: .caption))
+                        .foregroundStyle(Theme.muted)
                 }
 
-                Section {
-                    LabeledContent("Every") {
-                        HStack {
-                            TextField("5000", text: $everyMiles)
-                                .keyboardType(.numberPad)
-                                .multilineTextAlignment(.trailing)
-                            Text("mi").foregroundStyle(.secondary)
-                        }
-                    }
-                    LabeledContent("Or every") {
-                        HStack {
-                            TextField("6", text: $everyMonths)
-                                .keyboardType(.numberPad)
-                                .multilineTextAlignment(.trailing)
-                            Text("months").foregroundStyle(.secondary)
-                        }
-                    }
-                } header: {
-                    Text("Next due (optional)")
-                } footer: {
-                    dueMessage
+                SectionTitle("Next due") {
+                    Text("Use either or both")
+                        .font(.dipstick(11.5, relativeTo: .caption))
+                        .foregroundStyle(Theme.muted)
                 }
+                .padding(.top, 6)
+                nextDuePanel
 
-                Section("Notes") {
-                    TextField("Notes", text: $notes, axis: .vertical)
-                        .lineLimit(3...)
-                }
+                notesField
             }
-            .keyboardDoneButton()
-            .navigationTitle(isEditing ? "Edit Service" : "Log Service")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
-                        .disabled(!canSave)
-                }
-            }
-            .onAppear { if !isEditing { prefillInterval() } }
-            .onChange(of: serviceChoice) { if !isEditing { prefillInterval() } }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Theme.ground)
+        .safeAreaInset(edge: .bottom) {
+            FormSaveBar(
+                title: "Save service", isEnabled: canSave, isKeyboardUp: isKeyboardUp,
+                onHideKeyboard: hideKeyboard, onSave: save
+            )
+        }
+        .tint(Theme.accent)
+        .onAppear { if !isEditing { prefillInterval() } }
+        .onChange(of: serviceChoice) { if !isEditing { prefillInterval() } }
+        .task {
+            if !isEditing { await focusAfterPresentation { odometerFocused = true } }
         }
     }
 
-    // MARK: Footers
-
-    @ViewBuilder
-    private var odometerMessage: some View {
-        if let reading = parsedOdometer, reading < vehicle.currentOdometer, !isEditing {
-            Text("Lower than the current \(Units.miles(vehicle.currentOdometer)). That's fine for older records.")
-        } else if !isEditing {
-            Text("Current odometer: \(Units.miles(vehicle.currentOdometer)).")
+    private var serviceChips: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(serviceOptions, id: \.self) { option in
+                        ChipButton(title: option, isSelected: option == serviceChoice) {
+                            serviceChoice = option
+                        }
+                        .id(option)
+                    }
+                }
+                .padding(.vertical, 1)
+            }
+            .scrollClipDisabled()
+            .onAppear { proxy.scrollTo(serviceChoice, anchor: .center) }
         }
     }
 
-    @ViewBuilder
-    private var costMessage: some View {
-        if manualCost != nil, partsTotal > 0 {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Parts add up to \(Units.currency(partsTotal)); the rest counts as labor or fees.")
-                Button("Use parts total") { manualCost = nil }
-                    .font(.footnote)
+    private var dateTile: some View {
+        Button { withAnimation { isPickingDate.toggle() } } label: {
+            VStack(alignment: .leading) {
+                SmallCapsLabel("Date")
+                Spacer(minLength: 4)
+                Text(Calendar.current.isDateInToday(date)
+                     ? "Today, \(date.formatted(.dateTime.month(.abbreviated).day()))"
+                     : date.formatted(.dateTime.month(.abbreviated).day().year()))
+                    .font(.dipstick(16, .semibold, relativeTo: .body))
+                    .foregroundStyle(Theme.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-        } else if partsTotal > 0 {
-            Text("Adds up your parts. Type a different total to include labor or shop fees.")
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+            .panel(radius: Theme.Radius.tile,
+                   border: isPickingDate ? Theme.accent : Theme.panelBorder,
+                   lineWidth: isPickingDate ? 1.5 : 1)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var partsPanel: some View {
+        VStack(spacing: 0) {
+            ForEach($parts) { $part in
+                HStack(spacing: 10) {
+                    TextField("Part name", text: $part.name,
+                              prompt: Text("Part name").foregroundStyle(Theme.faint))
+                        .font(.dipstick(15, .semibold, relativeTo: .body))
+                        .foregroundStyle(Theme.text)
+                        .focused($focusedPart, equals: .name(part.id))
+                    TextField("$0.00", text: $part.cost,
+                              prompt: Text("$0.00").foregroundStyle(Theme.faint))
+                        .font(.readout(15, relativeTo: .body))
+                        .foregroundStyle(Theme.text)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 80)
+                        .focused($focusedPart, equals: .cost(part.id))
+                    Button {
+                        parts.removeAll { $0.id == part.id }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.muted)
+                            .frame(width: 36, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Remove \(part.name.isEmpty ? "part" : part.name)")
+                }
+                .padding(.leading, 16)
+                .padding(.trailing, 6)
+                .frame(minHeight: 52)
+                FormDivider()
+            }
+            Button {
+                let draft = PartDraft(name: "", cost: "")
+                parts.append(draft)
+                focusedPart = .name(draft.id)
+            } label: {
+                Label("Add part", systemImage: "plus")
+                    .font(.dipstick(14, .semibold, relativeTo: .body))
+                    .foregroundStyle(Theme.accent)
+                    .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .panel(radius: Theme.Radius.field)
+    }
+
+    private var nextDuePanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                NumberTileField(label: "Every", text: $everyMiles, placeholder: "—",
+                                unit: "mi", keyboard: .numberPad, size: 22, height: 66, focus: $milesFocused)
+                NumberTileField(label: "Or every", text: $everyMonths, placeholder: "—",
+                                unit: "months", keyboard: .numberPad, size: 22, height: 66, focus: $monthsFocused)
+            }
+            dueResult
+        }
+        .padding(10)
+        .panel(radius: Theme.Radius.field)
+    }
+
+    @ViewBuilder
+    private var dueResult: some View {
+        if let interval {
+            if !interval.isEmpty, let reading = parsedOdometer {
+                let due = MaintenanceSchedule.nextDue(odometer: reading, date: date, every: interval)
+                let parts = [
+                    due.odometer.map { "\($0.formatted()) mi" },
+                    due.date.map { $0.formatted(.dateTime.month(.abbreviated).year()) },
+                ].compactMap { $0 }
+                StatusLine(status: .dueSoon,
+                           text: "Next at \(parts.joined(separator: " or "))\(parts.count == 2 ? ", whichever first" : "")")
+                    .padding(.horizontal, 6)
+            } else if !interval.isEmpty {
+                Text("Enter the odometer to see when it's next due.")
+                    .font(.dipstick(12, relativeTo: .caption))
+                    .foregroundStyle(Theme.muted)
+                    .padding(.horizontal, 6)
+            }
         } else {
-            Text("For a shop visit, enter the total from the bill.")
+            StatusLine(status: .overdue, text: "Use whole numbers for the interval")
+                .padding(.horizontal, 6)
         }
     }
 
-    @ViewBuilder
-    private var dueMessage: some View {
-        if let interval, let reading = parsedOdometer,
-           let summary = MaintenanceSchedule.nextDue(odometer: reading, date: date, every: interval).summary {
-            Text("Due at \(summary)\(interval.miles != nil && interval.months != nil ? ", whichever comes first" : "").")
-        } else if interval == nil {
-            Text("Enter whole numbers for the interval.")
-                .foregroundStyle(.red)
+    private var notesField: some View {
+        HStack(alignment: .center) {
+            SmallCapsLabel("Notes")
+            TextField("Optional", text: $notes,
+                      prompt: Text("Optional").foregroundStyle(Theme.faint), axis: .vertical)
+                .font(.dipstick(15, relativeTo: .body))
+                .foregroundStyle(Theme.text)
+                .multilineTextAlignment(.trailing)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(minHeight: 52)
+        .panel(radius: Theme.Radius.field)
+        .padding(.top, 6)
+    }
+
+    private func hideKeyboard() {
+        odometerFocused = false
+        costFocused = false
+        milesFocused = false
+        monthsFocused = false
+        focusedPart = nil
     }
 
     // MARK: Interval prefill
@@ -330,15 +459,4 @@ struct MaintenanceEntryFormView: View {
     private static func money(_ value: Double) -> String {
         String(format: "%.2f", value)
     }
-}
-
-#Preview {
-    let container = try! ModelContainer(
-        for: Vehicle.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
-    let vehicle = Vehicle(name: "Project Car", currentOdometer: 131_870)
-    container.mainContext.insert(vehicle)
-    return MaintenanceEntryFormView(vehicle: vehicle)
-        .modelContainer(container)
 }

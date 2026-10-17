@@ -85,6 +85,7 @@ struct NumberTileField: View {
     var unit: String?
     var keyboard: UIKeyboardType = .decimalPad
     var size: CGFloat = 30
+    var height: CGFloat = 92
     var focus: FocusState<Bool>.Binding
 
     var body: some View {
@@ -121,7 +122,7 @@ struct NumberTileField: View {
             }
         }
         .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: height, alignment: .leading)
         .panel(radius: Theme.Radius.tile,
                border: focus.wrappedValue ? Theme.accent : Theme.panelBorder,
                lineWidth: focus.wrappedValue ? 1.5 : 1)

@@ -116,7 +116,7 @@ struct VehicleListView: View {
             .fullScreenCover(item: $vehicleToFuel) { vehicle in
                 FillUpFlowView(vehicle: vehicle, startInScanner: true)
             }
-            .sheet(item: $serviceRequest) { request in
+            .fullScreenCover(item: $serviceRequest) { request in
                 MaintenanceEntryFormView(vehicle: request.vehicle, serviceType: request.serviceType)
             }
             #if DEBUG

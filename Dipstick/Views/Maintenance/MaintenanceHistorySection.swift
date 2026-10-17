@@ -6,9 +6,11 @@
 import SwiftUI
 import SwiftData
 
-/// Maintenance part of the vehicle detail list: a log button, search and a
-/// service-type filter, then every record newest first. The parent presents
-/// the sheets (see `FuelHistorySection` for why).
+/// Maintenance tab of vehicle detail (design board E / O): LOG SERVICE,
+/// search and a filter, a chip row of this car's service types, then every
+/// record newest first. The latest record of each type shows when it's next
+/// due. Tap a record to edit it, swipe to delete. The parent presents the
+/// sheets (see `FuelHistorySection` for why).
 struct MaintenanceHistorySection: View {
     let vehicle: Vehicle
     let onLog: () -> Void
@@ -25,9 +27,10 @@ struct MaintenanceHistorySection: View {
         }
     }
 
+    /// This car's service types, most recently done first.
     private var typesInUse: [String] {
-        Array(Set(entries.map(\.serviceType)))
-            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        var seen = Set<String>()
+        return entries.map(\.serviceType).filter { seen.insert($0.lowercased()).inserted }
     }
 
     var body: some View {
@@ -36,66 +39,100 @@ struct MaintenanceHistorySection: View {
         let dueByEntry = Dictionary(uniqueKeysWithValues: vehicle.maintenanceDueItems().map { ($0.id, $0) })
 
         Section {
-            Button("Log Service", systemImage: "wrench.and.screwdriver") {
+            Button {
                 isSearching = false
                 onLog()
+            } label: {
+                Label("Log service", systemImage: "wrench.adjustable")
             }
+            .buttonStyle(BigActionButtonStyle(height: 56))
+            .plainRow(top: 12, bottom: 8)
 
             if !all.isEmpty {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField("Search services, parts, notes", text: $query)
-                        .autocorrectionDisabled()
-                        .submitLabel(.search)
-                        .focused($isSearching)
-                    if !query.isEmpty {
-                        Button("Clear search", systemImage: "xmark.circle.fill") { query = "" }
-                            .labelStyle(.iconOnly)
-                            .foregroundStyle(.secondary)
-                            .buttonStyle(.borderless)
-                    }
-                    Menu {
-                        Picker("Service", selection: $typeFilter) {
-                            Text("All services").tag(String?.none)
-                            ForEach(typesInUse, id: \.self) { Text($0).tag(Optional($0)) }
-                        }
-                    } label: {
-                        Image(systemName: typeFilter == nil
-                              ? "line.3.horizontal.decrease.circle"
-                              : "line.3.horizontal.decrease.circle.fill")
-                    }
-                    .accessibilityLabel("Filter by service")
-                }
+                searchRow.plainRow(top: 4, bottom: 4)
+                chipRow.plainRow(top: 4, bottom: 8)
             }
 
-            ForEach(shown) { entry in
-                Button {
-                    // Otherwise the search field grabs focus again when the sheet closes.
-                    isSearching = false
-                    onEdit(entry)
-                } label: {
-                    MaintenanceEntryRow(entry: entry, dueItem: dueByEntry[entry.persistentModelID])
-                }
-                .tint(.primary)
-                .swipeActions {
-                    Button("Delete", role: .destructive) {
-                        modelContext.delete(entry)
+            if shown.isEmpty {
+                Text(all.isEmpty ? "No services logged yet." : "No services match.")
+                    .font(.dipstick(14, relativeTo: .subheadline))
+                    .foregroundStyle(Theme.muted)
+                    .panelRow(.only)
+            } else {
+                ForEach(Array(shown.enumerated()), id: \.element.id) { index, entry in
+                    Button {
+                        // Otherwise the search field grabs focus again when the sheet closes.
+                        isSearching = false
+                        onEdit(entry)
+                    } label: {
+                        MaintenanceEntryRow(entry: entry, dueItem: dueByEntry[entry.persistentModelID])
                     }
-                    .tint(Theme.red)
+                    .buttonStyle(.borderless)
+                    .panelRow(.of(index, count: shown.count))
+                    .swipeActions {
+                        Button("Delete", role: .destructive) {
+                            modelContext.delete(entry)
+                        }
+                        .tint(Theme.red)
+                    }
                 }
-            }
-        } header: {
-            Text("Maintenance")
-        } footer: {
-            if all.isEmpty {
-                Text("No services logged yet.")
-            } else if shown.isEmpty {
-                Text("No services match.")
-            } else if typeFilter != nil || !query.isEmpty {
-                Text("Showing \(shown.count) of \(all.count).")
             }
         }
+    }
+
+    private var searchRow: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(Theme.muted)
+                TextField("Search services, parts, notes", text: $query,
+                          prompt: Text("Search services, parts, notes").foregroundStyle(Theme.faint))
+                    .font(.dipstick(14, relativeTo: .body))
+                    .foregroundStyle(Theme.text)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .focused($isSearching)
+                if !query.isEmpty {
+                    Button("Clear search", systemImage: "xmark.circle.fill") { query = "" }
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(Theme.muted)
+                        .buttonStyle(.borderless)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 48)
+            .panel(radius: Theme.Radius.field)
+
+            Menu {
+                Picker("Service", selection: $typeFilter) {
+                    Text("All services").tag(String?.none)
+                    ForEach(typesInUse, id: \.self) { Text($0).tag(Optional($0)) }
+                }
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(typeFilter == nil ? Theme.text : Theme.accent)
+                    .frame(width: 48, height: 48)
+                    .panel(radius: Theme.Radius.field,
+                           border: typeFilter == nil ? Theme.panelBorder : Theme.accent)
+            }
+            .accessibilityLabel("Filter by service")
+        }
+    }
+
+    private var chipRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ChipButton(title: "All", isSelected: typeFilter == nil) { typeFilter = nil }
+                ForEach(typesInUse, id: \.self) { type in
+                    ChipButton(title: type, isSelected: typeFilter == type) {
+                        typeFilter = typeFilter == type ? nil : type
+                    }
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .scrollClipDisabled()
     }
 }
 
@@ -106,37 +143,40 @@ private struct MaintenanceEntryRow: View {
     let dueItem: MaintenanceDueCalculator.Item<PersistentIdentifier>?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(entry.serviceType)
-                    .font(.headline)
-                Spacer()
-                Text(Units.currency(entry.cost))
-                    .font(.headline)
-                    .monospacedDigit()
+                    .font(.dipstick(15, .semibold, relativeTo: .body))
+                    .foregroundStyle(Theme.text)
+                Text("\(entry.date.formatted(.dateTime.month(.abbreviated).day().year())) · \(Units.miles(entry.odometer))")
+                    .font(.dipstick(12, relativeTo: .caption))
+                    .foregroundStyle(Theme.muted)
+                if let detail {
+                    Text(detail)
+                        .font(.dipstick(12, relativeTo: .caption))
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(2)
+                }
+                if let dueItem {
+                    StatusLine(status: dueItem.status, text: "\(dueItem.nextLabel) · \(dueItem.shortSummary)")
+                        .padding(.top, 3)
+                }
             }
-            Text("\(entry.date.formatted(date: .abbreviated, time: .omitted)) · \(Units.miles(entry.odometer))")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            let partNames = entry.sortedParts.map(\.name)
-            if !partNames.isEmpty {
-                Text(partNames.joined(separator: ", "))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-            if let notes = entry.notes {
-                Text(notes)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            if let dueItem, let due = dueItem.due.summary {
-                Label("Next: \(due) · \(dueItem.summary)", systemImage: dueItem.status.systemImage)
-                    .font(.caption)
-                    .foregroundStyle(dueItem.status.color)
+            Spacer(minLength: 8)
+            if entry.cost > 0 {
+                MonoNumber(text: Units.currency(entry.cost), size: 15)
             }
         }
+        .multilineTextAlignment(.leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Edit this service")
+    }
+
+    /// Parts used, or the notes when there are no parts.
+    private var detail: String? {
+        let parts = entry.sortedParts.map(\.name)
+        if !parts.isEmpty { return parts.joined(separator: ", ") }
+        return entry.notes
     }
 }
