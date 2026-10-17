@@ -110,7 +110,7 @@ struct VehicleListView: View {
             .navigationDestination(for: Vehicle.self) { vehicle in
                 VehicleDetailView(vehicle: vehicle)
             }
-            .sheet(isPresented: $isAdding) {
+            .fullScreenCover(isPresented: $isAdding) {
                 VehicleFormView()
             }
             .fullScreenCover(item: $vehicleToFuel) { vehicle in

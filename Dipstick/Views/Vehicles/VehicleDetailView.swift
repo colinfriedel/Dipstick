@@ -88,7 +88,7 @@ struct VehicleDetailView: View {
         } message: {
             Text(importError ?? "")
         }
-        .sheet(isPresented: $isEditing) {
+        .fullScreenCover(isPresented: $isEditing) {
             VehicleFormView(vehicle: vehicle)
         }
         .sheet(isPresented: $isUpdatingOdometer) {

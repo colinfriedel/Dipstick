@@ -30,3 +30,12 @@ struct ThemeTests {
         #expect(Color(hexString: "#12345") == nil)
     }
 }
+
+@MainActor
+struct ColorHexTests {
+    @Test func hexRoundTrips() {
+        for hex in VehicleFormView.swatches {
+            #expect(Color(hexString: hex)?.hexString == hex)
+        }
+    }
+}
