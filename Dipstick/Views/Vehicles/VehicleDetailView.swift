@@ -64,9 +64,6 @@ struct VehicleDetailView: View {
                 )
             case .stats:
                 FuelStatsSection(vehicle: vehicle)
-                #if DEBUG
-                TripTestingSection(vehicle: vehicle)
-                #endif
             }
         }
         .listStyle(.plain)
