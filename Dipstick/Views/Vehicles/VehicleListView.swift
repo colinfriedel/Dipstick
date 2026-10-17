@@ -53,12 +53,12 @@ struct VehicleListView: View {
         NavigationStack(path: $path) {
             List {
                 header
-                    .homeRow(top: 4, bottom: 10)
+                    .plainRow(top: 4, bottom: 10)
 
                 if vehicles.isEmpty {
-                    emptyState.homeRow()
+                    emptyState.plainRow()
                 } else {
-                    SmallCapsLabel("Vehicles").homeRow(top: 0, bottom: 4)
+                    SmallCapsLabel("Vehicles").plainRow(top: 0, bottom: 4)
                     ForEach(vehicles) { vehicle in
                         VehicleCard(vehicle: vehicle) {
                             vehicleToFuel = vehicle
@@ -67,7 +67,7 @@ struct VehicleListView: View {
                         .onTapGesture { path.append(vehicle) }
                         .accessibilityAddTraits(.isButton)
                         .accessibilityAction { path.append(vehicle) }
-                        .homeRow()
+                        .plainRow()
                         .swipeActions(edge: .leading) {
                             Button("Log Fill-Up", systemImage: "fuelpump") { vehicleToFuel = vehicle }
                                 .tint(Theme.accent)
@@ -78,6 +78,7 @@ struct VehicleListView: View {
                         }
                         .swipeActions(edge: .trailing) {
                             Button("Delete", role: .destructive) { vehicleToDelete = vehicle }
+                                .tint(Theme.red)
                         }
                     }
 
@@ -85,11 +86,11 @@ struct VehicleListView: View {
                     SectionTitle("Service lamps") {
                         SmallCapsLabel("\(due.count) active")
                     }
-                    .homeRow(top: 16, bottom: 4)
+                    .plainRow(top: 16, bottom: 4)
                     ServiceLampsPanel(rows: due) { row in
                         serviceRequest = ServiceRequest(vehicle: row.vehicle, serviceType: row.item.serviceType)
                     }
-                    .homeRow()
+                    .plainRow()
                 }
 
                 #if DEBUG
@@ -97,7 +98,7 @@ struct VehicleListView: View {
                     DebugDashedRow(title: "Unassigned trips (testing) · \(unassignedTrips.count)") {
                         isShowingUnassigned = true
                     }
-                    .homeRow(top: 18)
+                    .plainRow(top: 18)
                 }
                 #endif
             }
@@ -112,9 +113,8 @@ struct VehicleListView: View {
             .sheet(isPresented: $isAdding) {
                 VehicleFormView()
             }
-            .sheet(item: $vehicleToFuel) { vehicle in
-                // Step 4 of the design spec replaces this with the pump scanner.
-                FuelEntryFormView(vehicle: vehicle)
+            .fullScreenCover(item: $vehicleToFuel) { vehicle in
+                FillUpFlowView(vehicle: vehicle, startInScanner: true)
             }
             .sheet(item: $serviceRequest) { request in
                 MaintenanceEntryFormView(vehicle: request.vehicle, serviceType: request.serviceType)
@@ -316,15 +316,6 @@ struct DebugDashedRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.borderless)
-    }
-}
-
-private extension View {
-    /// A full-width Home row: no list background, separator or default insets.
-    func homeRow(top: CGFloat = 5, bottom: CGFloat = 5) -> some View {
-        listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
-            .listRowInsets(EdgeInsets(top: top, leading: 16, bottom: bottom, trailing: 16))
     }
 }
 

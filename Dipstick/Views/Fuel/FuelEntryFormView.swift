@@ -6,14 +6,20 @@
 import SwiftUI
 import SwiftData
 
-/// Sheet for logging a fill-up (pass no entry) or editing one. Kept short so
-/// logging at the pump takes well under 30 seconds.
+/// Log or edit a fill-up (design boards H and I). For a new fill-up the
+/// odometer is never pre-filled: enter what the dash shows. After a scan,
+/// gallons and total arrive filled in and only the odometer is left.
+/// Shown inside `FillUpFlowView`, which handles the scanner.
 struct FuelEntryFormView: View {
     let vehicle: Vehicle
     let entry: FuelEntry?
+    /// Set when gallons and total came from the pump scanner.
+    let scanned: PumpReadingParser.Reading?
+    /// Open the scanner (SCAN PUMP / Rescan). Nil hides scanning (editing).
+    let onScan: (() -> Void)?
+    let onClose: () -> Void
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
 
     @State private var date: Date
     @State private var odometer: String
@@ -22,32 +28,37 @@ struct FuelEntryFormView: View {
     @State private var isFullTank: Bool
     @State private var station: String
     @State private var notes: String
+    @State private var isPickingDate = false
+    @State private var showsOptional: Bool
 
-    @State private var isScanning = false
-    @State private var filledFromScan = false
+    @FocusState private var odometerFocused: Bool
+    @FocusState private var gallonsFocused: Bool
+    @FocusState private var totalFocused: Bool
 
-    private enum Field { case odometer, gallons, totalCost }
-    @FocusState private var focusedField: Field?
-
-    init(vehicle: Vehicle, entry: FuelEntry? = nil) {
+    init(vehicle: Vehicle, entry: FuelEntry? = nil, scanned: PumpReadingParser.Reading? = nil,
+         onScan: (() -> Void)? = nil, onClose: @escaping () -> Void) {
         self.vehicle = vehicle
         self.entry = entry
+        self.scanned = scanned
+        self.onScan = onScan
+        self.onClose = onClose
         _date = State(initialValue: entry?.date ?? Date())
-        _odometer = State(initialValue: String(entry?.odometer ?? vehicle.currentOdometer))
-        _gallons = State(initialValue: entry.map {
-            $0.gallons.formatted(.number.precision(.fractionLength(0...3)).grouping(.never))
-        } ?? "")
-        _totalCost = State(initialValue: entry.flatMap { $0.isCostKnown ? String(format: "%.2f", $0.totalCost) : nil } ?? "")
+        _odometer = State(initialValue: entry.map { String($0.odometer) } ?? "")
+        _gallons = State(initialValue: scanned.map { String(format: "%.3f", $0.gallons) }
+            ?? entry.map { $0.gallons.formatted(.number.precision(.fractionLength(0...3)).grouping(.never)) } ?? "")
+        _totalCost = State(initialValue: scanned.map { String(format: "%.2f", $0.total) }
+            ?? entry.flatMap { $0.isCostKnown ? String(format: "%.2f", $0.totalCost) : nil } ?? "")
         _isFullTank = State(initialValue: entry?.isFullTank ?? true)
         _station = State(initialValue: entry?.station ?? "")
         _notes = State(initialValue: entry?.notes ?? "")
+        _showsOptional = State(initialValue: !(entry?.station ?? "").isEmpty || !(entry?.notes ?? "").isEmpty)
     }
 
     private var isEditing: Bool { entry != nil }
 
     /// Average price of this car's last few fill-ups with a known cost, used to
     /// sanity-check a scanned reading.
-    private var recentPricePerGallon: Double? {
+    static func recentPricePerGallon(for vehicle: Vehicle) -> Double? {
         let recent = (vehicle.fuelEntries ?? [])
             .filter(\.isCostKnown)
             .sorted { $0.date > $1.date }
@@ -82,8 +93,8 @@ struct FuelEntryFormView: View {
         return otherEntries.first { $0.odometer == reading }
     }
 
-    /// The highest-odometer fill-up above this reading, if any. Lower readings are
-    /// allowed (e.g. backfilling old receipts) but worth pointing out.
+    /// The highest-odometer fill-up above this reading, if any. Lower readings
+    /// are allowed (e.g. backfilling old receipts) but worth pointing out.
     private var higherEntry: FuelEntry? {
         guard let reading = parsedOdometer else { return nil }
         return otherEntries.filter { $0.odometer > reading }.max { $0.odometer < $1.odometer }
@@ -96,96 +107,157 @@ struct FuelEntryFormView: View {
     // MARK: Body
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    DatePicker("Date", selection: $date, displayedComponents: .date)
-                    LabeledContent("Odometer") {
-                        TextField("Miles", text: $odometer)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                            .focused($focusedField, equals: .odometer)
-                    }
-                } footer: {
-                    odometerMessage
-                }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                FormHeader(title: isEditing ? "Edit fill-up" : "Log fill-up", vehicle: vehicle, onCancel: onClose)
+                    .padding(.bottom, 6)
 
-                Section {
-                    if !isEditing {
-                        Button("Scan Pump", systemImage: "camera.viewfinder") { isScanning = true }
-                    }
-                    LabeledContent("Gallons") {
-                        TextField("0.000", text: $gallons)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .focused($focusedField, equals: .gallons)
-                    }
-                    LabeledContent("Total cost") {
-                        TextField("$0.00", text: $totalCost)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .focused($focusedField, equals: .totalCost)
-                    }
-                    if let gallons = parsedGallons, let cost = parsedTotalCost, cost > 0 {
-                        LabeledContent("Price", value: Units.pricePerGallon(cost / gallons))
-                    }
-                    Toggle("Filled the tank", isOn: $isFullTank)
-                } footer: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        if filledFromScan {
-                            Label("Filled from the pump screen. Check before saving.", systemImage: "camera.viewfinder")
+                if let onScan {
+                    if scanned != nil {
+                        scannedBanner(onRescan: onScan)
+                    } else {
+                        Button(action: onScan) {
+                            Label("Scan pump", systemImage: "viewfinder")
                         }
-                        if totalCost.trimmingCharacters(in: .whitespaces).isEmpty {
-                            Text("Don't know the cost? Leave it blank; spend stats will skip this fill-up.")
-                        }
-                        if !isFullTank {
-                            Text("Partial fills aren't given their own MPG. Their gallons count toward the next full tank.")
-                        }
+                        .buttonStyle(BigActionButtonStyle(height: 56))
                     }
                 }
 
-                Section("Optional") {
-                    TextField("Station", text: $station)
-                        .textInputAutocapitalization(.words)
-                    TextField("Notes", text: $notes, axis: .vertical)
+                OdometerField(text: $odometer, focus: $odometerFocused)
+                odometerProblem
+
+                HStack(spacing: 10) {
+                    NumberTileField(label: "Gallons", text: $gallons, placeholder: "0.000",
+                                    unit: "gal", focus: $gallonsFocused)
+                    NumberTileField(label: "Total cost", text: $totalCost, placeholder: "$0.00",
+                                    prefix: "$", focus: $totalFocused)
                 }
+                Text(priceCaption)
+                    .font(.dipstick(11.5, relativeTo: .caption))
+                    .foregroundStyle(Theme.muted)
+
+                detailsPanel
             }
-            .keyboardDoneButton()
-            .navigationTitle(isEditing ? "Edit Fill-Up" : "Log Fill-Up")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
-                        .disabled(!canSave)
-                }
-            }
-            .fullScreenCover(isPresented: $isScanning) {
-                PumpScannerView(expectedPrice: recentPricePerGallon) { reading in
-                    gallons = String(format: "%.3f", reading.gallons)
-                    totalCost = String(format: "%.2f", reading.total)
-                    filledFromScan = true
-                }
-            }
-            .task {
-                if !isEditing { await focusAfterPresentation { focusedField = .odometer } }
-            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Theme.ground)
+        .safeAreaInset(edge: .bottom) {
+            FormSaveBar(
+                title: "Save fill-up", isEnabled: canSave,
+                isKeyboardUp: odometerFocused || gallonsFocused || totalFocused,
+                onHideKeyboard: {
+                    odometerFocused = false
+                    gallonsFocused = false
+                    totalFocused = false
+                },
+                onSave: save
+            )
+        }
+        .tint(Theme.accent)
+        .task {
+            if !isEditing { await focusAfterPresentation { odometerFocused = true } }
         }
     }
 
-    @ViewBuilder
-    private var odometerMessage: some View {
-        if let duplicate = duplicateEntry {
-            Text("You already logged a fill-up at \(Units.miles(duplicate.odometer)) on \(duplicate.date.formatted(date: .abbreviated, time: .omitted)).")
-                .foregroundStyle(.red)
-        } else if let higher = higherEntry {
-            Text("Lower than your \(higher.date.formatted(date: .abbreviated, time: .omitted)) fill-up at \(Units.miles(higher.odometer)). That's fine if you're logging an older receipt.")
-                .foregroundStyle(.orange)
-        } else if !isEditing {
-            Text("Last reading: \(Units.miles(vehicle.currentOdometer)).")
+    private func scannedBanner(onRescan: @escaping () -> Void) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Color.green)
+            Text("Scanned from pump")
+                .font(.dipstick(14, .semibold, relativeTo: .subheadline))
+                .foregroundStyle(Theme.text)
+            Spacer()
+            Button("Rescan", action: onRescan)
+                .buttonStyle(SmallControlButtonStyle())
         }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 56)
+        .panel(radius: Theme.Radius.button)
+    }
+
+    @ViewBuilder
+    private var odometerProblem: some View {
+        if let duplicate = duplicateEntry {
+            StatusLine(status: .overdue, text: "Already logged a fill-up at \(Units.miles(duplicate.odometer)) on \(duplicate.date.formatted(date: .abbreviated, time: .omitted))")
+        } else if let higher = higherEntry {
+            StatusLine(status: .dueSoon, text: "Lower than your \(higher.date.formatted(date: .abbreviated, time: .omitted)) fill-up at \(Units.miles(higher.odometer))")
+        }
+    }
+
+    private var priceCaption: String {
+        if let gallons = parsedGallons, let cost = parsedTotalCost, cost > 0 {
+            return "\(Units.pricePerGallon(cost / gallons)) · worked out from the other two"
+        }
+        if totalCost.isEmpty && parsedGallons != nil {
+            return "No total? Leave it blank; spend stats will skip this fill-up."
+        }
+        return "Price per gallon is worked out from gallons and total"
+    }
+
+    private var detailsPanel: some View {
+        VStack(spacing: 0) {
+            Button { withAnimation { isPickingDate.toggle() } } label: {
+                FormRow("Date") {
+                    HStack(spacing: 6) {
+                        Text(date.formRowText)
+                            .font(.dipstick(15, .semibold, relativeTo: .body))
+                            .foregroundStyle(Theme.text)
+                        Image(systemName: isPickingDate ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if isPickingDate {
+                DatePicker("Date", selection: $date, in: ...Date.now.addingTimeInterval(86_400))
+                    .datePickerStyle(.graphical)
+                    .labelsHidden()
+                    .padding(.horizontal, 8)
+            }
+
+            FormDivider()
+            FormRow("Full tank", subtitle: "Turn off for a partial fill") {
+                Toggle("Full tank", isOn: $isFullTank).labelsHidden().tint(Theme.accent)
+            }
+
+            FormDivider()
+            Button { withAnimation { showsOptional.toggle() } } label: {
+                FormRow("Station, notes") {
+                    HStack(spacing: 6) {
+                        Text("Optional")
+                            .font(.dipstick(14, relativeTo: .body))
+                            .foregroundStyle(Theme.muted)
+                        Image(systemName: showsOptional ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if showsOptional {
+                VStack(spacing: 0) {
+                    TextField("Station", text: $station,
+                              prompt: Text("Station").foregroundStyle(Theme.faint))
+                        .textInputAutocapitalization(.words)
+                        .frame(minHeight: 44)
+                    FormDivider().padding(.leading, -16)
+                    TextField("Notes", text: $notes,
+                              prompt: Text("Notes").foregroundStyle(Theme.faint), axis: .vertical)
+                        .frame(minHeight: 44)
+                }
+                .font(.dipstick(15, relativeTo: .body))
+                .foregroundStyle(Theme.text)
+                .padding(.horizontal, 16)
+            }
+        }
+        .panel(radius: Theme.Radius.field)
     }
 
     // MARK: Saving
@@ -209,7 +281,7 @@ struct FuelEntryFormView: View {
             target.vehicle = vehicle
         }
         vehicle.recordOdometer(odometerValue)
-        dismiss()
+        onClose()
     }
 
     private func nilIfBlank(_ text: String) -> String? {
@@ -218,13 +290,54 @@ struct FuelEntryFormView: View {
     }
 }
 
-#Preview {
-    let container = try! ModelContainer(
-        for: Vehicle.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
-    let vehicle = Vehicle(name: "Daily Driver", currentOdometer: 48_210)
-    container.mainContext.insert(vehicle)
-    return FuelEntryFormView(vehicle: vehicle)
-        .modelContainer(container)
+/// The whole fill-up flow in one full-screen cover: the pump scanner and the
+/// form, switching in place. From Home it starts in the scanner; from the
+/// Fuel tab (and for edits) it starts in the form.
+struct FillUpFlowView: View {
+    let vehicle: Vehicle
+    var entry: FuelEntry?
+    var startInScanner = false
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var isScanning: Bool
+    @State private var reading: PumpReadingParser.Reading?
+    /// Bumped to rebuild the form with a new scan.
+    @State private var formID = UUID()
+
+    init(vehicle: Vehicle, entry: FuelEntry? = nil, startInScanner: Bool = false) {
+        self.vehicle = vehicle
+        self.entry = entry
+        self.startInScanner = startInScanner
+        _isScanning = State(initialValue: startInScanner && entry == nil)
+    }
+
+    var body: some View {
+        ZStack {
+            if isScanning {
+                PumpScannerView(
+                    vehicle: vehicle,
+                    expectedPrice: FuelEntryFormView.recentPricePerGallon(for: vehicle),
+                    onReading: { scan in
+                        reading = scan
+                        formID = UUID()
+                        withAnimation { isScanning = false }
+                    },
+                    onEnterManually: { withAnimation { isScanning = false } },
+                    onClose: {
+                        // From Home there's no form to go back to.
+                        if startInScanner && reading == nil { dismiss() } else { withAnimation { isScanning = false } }
+                    }
+                )
+                .transition(.opacity)
+            } else {
+                FuelEntryFormView(
+                    vehicle: vehicle, entry: entry, scanned: reading,
+                    onScan: entry == nil ? { withAnimation { isScanning = true } } : nil,
+                    onClose: { dismiss() }
+                )
+                .id(formID)
+                .transition(.opacity)
+            }
+        }
+    }
 }

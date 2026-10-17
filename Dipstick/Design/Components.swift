@@ -168,8 +168,8 @@ struct ReadoutTile<Value: View>: View {
             Spacer(minLength: 4)
             value
         }
-        .frame(maxWidth: .infinity, minHeight: height, alignment: .leading)
         .padding(12)
+        .frame(maxWidth: .infinity, minHeight: height, alignment: .leading)
         .panel(radius: Theme.Radius.tile,
                border: highlighted ? Theme.accent : Theme.panelBorder,
                lineWidth: highlighted ? 1.5 : 1)
@@ -211,6 +211,9 @@ struct BigActionButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .labelStyle(BigActionLabelStyle())
+            .font(.dipstick(16, .semibold, relativeTo: .headline))
+            .tracking(2)
+            .textCase(.uppercase)
             .frame(maxWidth: .infinity, minHeight: height)
             .background(RoundedRectangle(cornerRadius: Theme.Radius.button)
                 .fill(configuration.isPressed ? Theme.selectedFill : Theme.controlFill))
@@ -358,5 +361,98 @@ struct ChipButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+// MARK: - List rows
+
+/// Where a row sits in a panel made of separate list rows.
+enum PanelRowPosition {
+    case only, first, middle, last
+
+    static func of(_ index: Int, count: Int) -> Self {
+        switch (index, count) {
+        case (_, 1): .only
+        case (0, _): .first
+        case (count - 1, _): .last
+        default: .middle
+        }
+    }
+}
+
+extension View {
+    /// A full-width custom row: no list background, separator or default insets.
+    func plainRow(top: CGFloat = 5, bottom: CGFloat = 5) -> some View {
+        listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: top, leading: 16, bottom: bottom, trailing: 16))
+    }
+
+    /// One row of a PanelList-style panel built from separate list rows, so
+    /// each row keeps swipe actions. Draws its slice of the rounded, bordered
+    /// panel and the divider above it.
+    func panelRow(_ position: PanelRowPosition) -> some View {
+        padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .listRowBackground(PanelRowBackground(position: position).padding(.horizontal, 16))
+            .listRowSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+    }
+}
+
+/// A slice of a rounded, bordered panel: the full panel shape is drawn taller
+/// than the row and clipped, so stacked rows read as one panel.
+private struct PanelRowBackground: View {
+    let position: PanelRowPosition
+
+    var body: some View {
+        GeometryReader { proxy in
+            let radius = Theme.Radius.panelList
+            let extraTop: CGFloat = (position == .first || position == .only) ? 0 : radius * 2
+            let extraBottom: CGFloat = (position == .last || position == .only) ? 0 : radius * 2
+            ZStack(alignment: .top) {
+                RoundedRectangle(cornerRadius: radius)
+                    .fill(Theme.panel)
+                    .overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(Theme.panelBorder, lineWidth: 1))
+                    .frame(height: proxy.size.height + extraTop + extraBottom)
+                    .offset(y: -extraTop)
+                if position == .middle || position == .last {
+                    Rectangle().fill(Theme.divider).frame(height: 1).padding(.leading, 16)
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+            .clipped()
+        }
+    }
+}
+
+/// The 3-way tab switch in vehicle detail.
+struct TabSwitch<Tab: Hashable & Identifiable>: View {
+    let tabs: [Tab]
+    @Binding var selection: Tab
+    let title: (Tab) -> String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(tabs) { tab in
+                let isSelected = tab == selection
+                Button { selection = tab } label: {
+                    Text(title(tab))
+                        .font(.dipstick(14, .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(isSelected ? Theme.text : Theme.muted)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(RoundedRectangle(cornerRadius: 11)
+                            .fill(isSelected ? Theme.selectedFill : Color.clear))
+                        .overlay(RoundedRectangle(cornerRadius: 11)
+                            .strokeBorder(isSelected ? Theme.selectedBorder : Color.clear, lineWidth: 1))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+            }
+        }
+        .padding(4)
+        .panel(radius: 14)
     }
 }

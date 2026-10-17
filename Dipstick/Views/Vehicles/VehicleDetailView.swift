@@ -43,42 +43,11 @@ struct VehicleDetailView: View {
 
     var body: some View {
         List {
-            Section {
-                Button { isUpdatingOdometer = true } label: {
-                    LabeledContent("Odometer") {
-                        HStack(spacing: 4) {
-                            Text(Units.miles(vehicle.currentOdometer))
-                            Image(systemName: "square.and.pencil")
-                                .foregroundStyle(.tint)
-                        }
-                    }
-                }
-                .tint(.primary)
-                .accessibilityHint("Update the odometer reading")
-                if let year = vehicle.year {
-                    LabeledContent("Year", value: String(year))
-                }
-                if let make = vehicle.make {
-                    LabeledContent("Make", value: make)
-                }
-                if let model = vehicle.model {
-                    LabeledContent("Model", value: model)
-                }
-                if let vin = vehicle.vin {
-                    LabeledContent("VIN") {
-                        Text(vin)
-                            .textSelection(.enabled)
-                    }
-                }
-            }
+            navRow.plainRow(top: 4, bottom: 6)
+            titleBlock.plainRow(top: 6, bottom: 10)
 
-            Picker("Log", selection: $log) {
-                ForEach(Log.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets())
+            TabSwitch(tabs: Log.allCases, selection: $log) { $0.rawValue }
+                .plainRow(top: 4, bottom: 4)
 
             switch log {
             case .fuel:
@@ -99,27 +68,12 @@ struct VehicleDetailView: View {
                 TripTestingSection(vehicle: vehicle)
                 #endif
             }
-
-            Section {
-                Button("Delete Vehicle", role: .destructive) {
-                    vehicleToDelete = vehicle
-                }
-            }
         }
-        .navigationTitle(vehicle.name)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Edit") { isEditing = true }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Menu("More", systemImage: "ellipsis") {
-                    ShareLink(item: vehicle.csvExportFile, preview: SharePreview("\(vehicle.name) records")) {
-                        Label("Export CSV", systemImage: "square.and.arrow.up")
-                    }
-                    Button("Import CSV…", systemImage: "square.and.arrow.down") { isImporting = true }
-                }
-            }
-        }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 1)
+        .scrollContentBackground(.hidden)
+        .background(Theme.ground)
+        .toolbar(.hidden, for: .navigationBar)
         .fileImporter(
             isPresented: $isImporting,
             allowedContentTypes: [.commaSeparatedText, .plainText]
@@ -143,11 +97,11 @@ struct VehicleDetailView: View {
         .sheet(isPresented: $isUpdatingOdometer) {
             OdometerUpdateView(vehicle: vehicle)
         }
-        .sheet(isPresented: $isLoggingFuel) {
-            FuelEntryFormView(vehicle: vehicle)
+        .fullScreenCover(isPresented: $isLoggingFuel) {
+            FillUpFlowView(vehicle: vehicle)
         }
-        .sheet(item: $editingFuelEntry) { entry in
-            FuelEntryFormView(vehicle: vehicle, entry: entry)
+        .fullScreenCover(item: $editingFuelEntry) { entry in
+            FillUpFlowView(vehicle: vehicle, entry: entry)
         }
         .sheet(isPresented: $isLoggingService) {
             MaintenanceEntryFormView(vehicle: vehicle)
@@ -158,6 +112,72 @@ struct VehicleDetailView: View {
         .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in
             dismiss()
             modelContext.delete(vehicle)
+        }
+    }
+
+    // MARK: Header
+
+    private var navRow: some View {
+        HStack(spacing: 8) {
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left").font(.system(size: 16, weight: .semibold))
+            }
+            .buttonStyle(SmallControlButtonStyle())
+            .accessibilityLabel("Back")
+
+            Spacer()
+
+            Button("Edit") { isEditing = true }
+                .buttonStyle(SmallControlButtonStyle())
+
+            Menu {
+                ShareLink(item: vehicle.csvExportFile, preview: SharePreview("\(vehicle.name) records")) {
+                    Label("Export CSV", systemImage: "square.and.arrow.up")
+                }
+                Button("Import CSV…", systemImage: "square.and.arrow.down") { isImporting = true }
+                Divider()
+                Button("Delete Vehicle", systemImage: "trash", role: .destructive) { vehicleToDelete = vehicle }
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 16, weight: .semibold))
+            }
+            .buttonStyle(SmallControlButtonStyle())
+            .accessibilityLabel("More")
+        }
+    }
+
+    private var titleBlock: some View {
+        let dueCount = vehicle.maintenanceDueItems().filter { $0.status != .ok }.count
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 10) {
+                CarChip(colorHex: vehicle.colorHex, size: 14)
+                Text(vehicle.name.uppercased())
+                    .font(.dipstick(30, .semibold, relativeTo: .largeTitle))
+                    .tracking(2)
+                    .foregroundStyle(Theme.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .accessibilityAddTraits(.isHeader)
+                if dueCount > 0 {
+                    CountPill(count: dueCount)
+                }
+            }
+            if !vehicle.yearMakeModel.isEmpty {
+                Text(vehicle.yearMakeModel)
+                    .font(.dipstick(13, relativeTo: .footnote))
+                    .foregroundStyle(Theme.muted)
+            }
+            HStack(spacing: 4) {
+                OdometerView(miles: vehicle.currentOdometer, size: 24)
+                Button { isUpdatingOdometer = true } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.muted)
+                        .frame(width: Theme.minimumHitTarget, height: Theme.minimumHitTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Update odometer")
+            }
         }
     }
 

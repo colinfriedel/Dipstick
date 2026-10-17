@@ -27,6 +27,11 @@ struct TripTestingSection: View {
                 isShowingRecorder = true
             }
             .disabled(recorder.isRecording && recorder.vehicle?.persistentModelID != vehicle.persistentModelID)
+            // On the button, not the Section: a modifier on a Section is copied
+            // onto every row, and the copies close each other's cover.
+            .fullScreenCover(isPresented: $isShowingRecorder) {
+                TripRecordingView()
+            }
 
             if recorder.authorizationDenied {
                 Text("Location access is off. Turn it on in Settings > Privacy & Security > Location Services > Dipstick.")
@@ -38,6 +43,7 @@ struct TripTestingSection: View {
                 TripRow(trip: trip)
                     .swipeActions {
                         Button("Delete", role: .destructive) { modelContext.delete(trip) }
+                            .tint(Theme.red)
                     }
                     .contextMenu {
                         if let log = SpeedLog.existingURL(forTripStartingAt: trip.startDate) {
@@ -51,9 +57,6 @@ struct TripTestingSection: View {
             Text("Trips (testing)")
         } footer: {
             Text("Debug builds only. Record a drive to check the city/highway split. Long-press a trip to export its speed log (speeds only, no locations).")
-        }
-        .fullScreenCover(isPresented: $isShowingRecorder) {
-            TripRecordingView()
         }
 
         AutomaticTripsSection(vehicle: vehicle)

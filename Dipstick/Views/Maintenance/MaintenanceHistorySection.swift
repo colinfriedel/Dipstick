@@ -82,6 +82,7 @@ struct MaintenanceHistorySection: View {
                     Button("Delete", role: .destructive) {
                         modelContext.delete(entry)
                     }
+                    .tint(Theme.red)
                 }
             }
         } header: {
