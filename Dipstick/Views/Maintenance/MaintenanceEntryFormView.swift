@@ -448,6 +448,7 @@ struct MaintenanceEntryFormView: View {
         }
 
         vehicle.recordOdometer(odometerValue)
+        modelContext.saveNow()
         dismiss()
     }
 

@@ -53,6 +53,32 @@ enum RecordCSV {
         var fuel: [FuelRow] = []
         var services: [ServiceRow] = []
         var problems: [Problem] = []
+        /// File row of each entry in `fuel` / `services` (header is row 1).
+        var fuelRowNumbers: [Int] = []
+        var serviceRowNumbers: [Int] = []
+        /// Data rows in the file (excluding the header).
+        var rowCount = 0
+    }
+
+    /// One row of the file as it will be handled on import.
+    struct PreviewItem: Identifiable, Equatable {
+        enum Kind: Equatable { case fuel, service, unknown }
+        enum Status: Equatable {
+            /// Will be imported.
+            case new
+            /// Already in the log (or repeated earlier in the file).
+            case skip
+            /// Can't be read; left out.
+            case fix(String)
+        }
+        let row: Int
+        let kind: Kind
+        let date: Date?
+        /// "Fill-up" or the service name.
+        let title: String
+        let detail: String
+        let status: Status
+        var id: Int { row }
     }
 
     // MARK: Writing
@@ -112,6 +138,7 @@ enum RecordCSV {
             return result
         }
 
+        result.rowCount = rows.count
         for (offset, fields) in rows.enumerated() {
             let rowNumber = offset + 2
             func value(_ column: String) -> String {
@@ -153,6 +180,7 @@ enum RecordCSV {
                     problem("full_tank should be yes or no, not \"\(value("full_tank"))\".")
                     continue
                 }
+                result.fuelRowNumbers.append(rowNumber)
                 result.fuel.append(FuelRow(
                     date: date, odometer: odometer, gallons: gallons, totalCost: cost,
                     isFullTank: !["no", "n", "false"].contains(fullText),
@@ -180,6 +208,7 @@ enum RecordCSV {
                     problem("next_due_date \"\(dueDateText)\" isn't YYYY-MM-DD.")
                     continue
                 }
+                result.serviceRowNumbers.append(rowNumber)
                 result.services.append(ServiceRow(
                     date: date, odometer: odometer, serviceType: serviceType, cost: cost, parts: parts,
                     nextDueOdometer: dueOdometer, nextDueDate: dueDate, notes: notes
@@ -219,6 +248,47 @@ enum RecordCSV {
             return false
         }
         return (fuel, services, duplicates)
+    }
+
+    /// Every row of the file in order, marked new, skip (duplicate) or fix
+    /// (unreadable), using the same duplicate rules as `newRows`.
+    static func previewItems(
+        _ parsed: Parsed,
+        existingFuelOdometers: Set<Int>,
+        existingServiceKeys: Set<String>,
+        calendar: Calendar = .current
+    ) -> [PreviewItem] {
+        var fuelSeen = existingFuelOdometers
+        var serviceSeen = existingServiceKeys
+        var items: [PreviewItem] = []
+
+        for (row, number) in zip(parsed.fuel, parsed.fuelRowNumbers) {
+            var parts = [String(format: "%.3f gal", row.gallons)]
+            if row.totalCost > 0 { parts.append(String(format: "$%.2f", row.totalCost)) }
+            parts.append("\(row.odometer.formatted()) mi")
+            items.append(PreviewItem(
+                row: number, kind: .fuel, date: row.date, title: "Fill-up",
+                detail: parts.joined(separator: " · "),
+                status: fuelSeen.insert(row.odometer).inserted ? .new : .skip
+            ))
+        }
+        for (row, number) in zip(parsed.services, parsed.serviceRowNumbers) {
+            var parts: [String] = []
+            if row.cost > 0 { parts.append(String(format: "$%.2f", row.cost)) }
+            parts.append("\(row.odometer.formatted()) mi")
+            let key = serviceKey(date: row.date, odometer: row.odometer, type: row.serviceType, calendar: calendar)
+            items.append(PreviewItem(
+                row: number, kind: .service, date: row.date, title: row.serviceType,
+                detail: parts.joined(separator: " · "),
+                status: serviceSeen.insert(key).inserted ? .new : .skip
+            ))
+        }
+        for problem in parsed.problems where problem.row > 1 {
+            items.append(PreviewItem(row: problem.row, kind: .unknown, date: nil,
+                                     title: "Row \(problem.row)", detail: problem.message,
+                                     status: .fix(problem.message)))
+        }
+        return items.sorted { $0.row < $1.row }
     }
 
     static func serviceKey(date: Date, odometer: Int, type: String, calendar: Calendar = .current) -> String {
@@ -303,6 +373,16 @@ extension Vehicle {
     /// Rows from `parsed` that aren't already in this vehicle's log.
     func importPlan(for parsed: RecordCSV.Parsed) -> (fuel: [RecordCSV.FuelRow], services: [RecordCSV.ServiceRow], duplicates: Int) {
         RecordCSV.newRows(
+            parsed,
+            existingFuelOdometers: Set((fuelEntries ?? []).map(\.odometer)),
+            existingServiceKeys: Set((maintenanceEntries ?? []).map {
+                RecordCSV.serviceKey(date: $0.date, odometer: $0.odometer, type: $0.serviceType)
+            })
+        )
+    }
+
+    func importPreview(for parsed: RecordCSV.Parsed) -> [RecordCSV.PreviewItem] {
+        RecordCSV.previewItems(
             parsed,
             existingFuelOdometers: Set((fuelEntries ?? []).map(\.odometer)),
             existingServiceKeys: Set((maintenanceEntries ?? []).map {

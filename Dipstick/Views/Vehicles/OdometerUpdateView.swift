@@ -13,6 +13,7 @@ struct OdometerUpdateView: View {
     let vehicle: Vehicle
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @State private var reading: String
     @FocusState private var isFocused: Bool
 
@@ -56,6 +57,7 @@ struct OdometerUpdateView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         if let parsed { vehicle.recordOdometer(parsed) }
+                        modelContext.saveNow()
                         dismiss()
                     }
                     .disabled(!canSave)

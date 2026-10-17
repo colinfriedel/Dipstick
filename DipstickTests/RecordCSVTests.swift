@@ -135,3 +135,25 @@ struct UnknownCostStatsTests {
         #expect(stats.costPerMile == 80.0 / 600.0)
     }
 }
+
+@MainActor
+struct ImportPreviewTests {
+    @Test func everyRowIsMarkedNewSkipOrFixInFileOrder() {
+        let text = """
+        type,date,odometer,gallons,total_cost,full_tank,station,service,parts,next_due_odometer,next_due_date,notes
+        fuel,2026-10-10,56482,9.768,60.06,yes,,,,,,
+        fuel,2026-10-01,56222,9.355,61.73,yes,,,,,,
+        service,2026-04-12,51798,,48.20,,,Oil change,,,,
+        fuel,2026-13-40,56100,9.0,,yes,,,,,,
+        """
+        let parsed = RecordCSV.decode(text)
+        #expect(parsed.rowCount == 4)
+        let items = RecordCSV.previewItems(parsed, existingFuelOdometers: [56_222], existingServiceKeys: [])
+        #expect(items.map(\.row) == [2, 3, 4, 5])
+        #expect(items[0].status == .new)
+        #expect(items[0].detail == "9.768 gal · $60.06 · 56,482 mi")
+        #expect(items[1].status == .skip)
+        #expect(items[2].status == .new && items[2].title == "Oil change")
+        if case .fix = items[3].status {} else { Issue.record("row 5 should need fixing") }
+    }
+}

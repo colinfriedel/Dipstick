@@ -42,7 +42,10 @@ struct TripTestingSection: View {
             ForEach(trips) { trip in
                 TripRow(trip: trip)
                     .swipeActions {
-                        Button("Delete", role: .destructive) { modelContext.delete(trip) }
+                        Button("Delete", role: .destructive) {
+                            modelContext.delete(trip)
+                            modelContext.saveNow()
+                        }
                             .tint(Theme.red)
                     }
                     .contextMenu {
@@ -70,6 +73,7 @@ private struct AutomaticTripsSection: View {
 
     @Environment(TripRecorder.self) private var recorder
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var modelContext
     @State private var message: String?
 
     var body: some View {
@@ -96,6 +100,7 @@ private struct AutomaticTripsSection: View {
                     Spacer()
                     Button("Remove", systemImage: "minus.circle.fill", role: .destructive) {
                         vehicle.removeConnection(id: connection.id)
+                        modelContext.saveNow()
                         message = nil
                     }
                     .labelStyle(.iconOnly)
@@ -112,6 +117,7 @@ private struct AutomaticTripsSection: View {
                         message = "\(connection.name) is already linked."
                     } else {
                         vehicle.addConnection(connection)
+                        modelContext.saveNow()
                         message = "Linked \(connection.name)."
                     }
                 } else {
@@ -165,6 +171,7 @@ struct UnassignedTripsSection: View {
                             Divider()
                             Button("Not My Car (Delete)", role: .destructive) {
                                 modelContext.delete(trip)
+                                modelContext.saveNow()
                             }
                         } label: {
                             Image(systemName: "car.badge.gearshape")
@@ -187,6 +194,7 @@ struct UnassignedTripsSection: View {
         if let id = trip.connectionID {
             vehicle.addConnection(CarConnection(name: trip.connectionName ?? id, id: id))
         }
+        modelContext.saveNow()
     }
 }
 

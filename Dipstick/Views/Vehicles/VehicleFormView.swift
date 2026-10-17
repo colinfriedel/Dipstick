@@ -282,6 +282,7 @@ struct VehicleFormView: View {
                             Spacer()
                             Button {
                                 vehicle.removeConnection(id: connection.id)
+                                modelContext.saveNow()
                                 connectionMessage = nil
                             } label: {
                                 Image(systemName: "xmark")
@@ -302,6 +303,7 @@ struct VehicleFormView: View {
                                 connectionMessage = "\(connection.name) is already linked."
                             } else {
                                 vehicle.addConnection(connection)
+                                modelContext.saveNow()
                                 connectionMessage = "Linked \(connection.name)."
                             }
                         } else {
@@ -358,6 +360,7 @@ struct VehicleFormView: View {
         if vehicle == nil {
             modelContext.insert(target)
         }
+        modelContext.saveNow()
         dismiss()
     }
 

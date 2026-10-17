@@ -75,6 +75,7 @@ struct FuelHistorySection: View {
                     .swipeActions {
                         Button("Delete", role: .destructive) {
                             modelContext.delete(entry)
+                            modelContext.saveNow()
                         }
                         .tint(Theme.red)
                     }

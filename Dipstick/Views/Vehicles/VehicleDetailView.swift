@@ -77,8 +77,14 @@ struct VehicleDetailView: View {
         ) { result in
             readImport(result)
         }
-        .sheet(item: $importFile) { file in
-            ImportPreviewView(vehicle: vehicle, filename: file.filename, parsed: file.parsed)
+        .fullScreenCover(item: $importFile) { file in
+            ImportPreviewView(vehicle: vehicle, filename: file.filename, parsed: file.parsed) {
+                // Change file: reopen the picker once the preview has closed.
+                Task {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    isImporting = true
+                }
+            }
         }
         .alert("Couldn't read file", isPresented: Binding(
             get: { importError != nil },
@@ -109,6 +115,7 @@ struct VehicleDetailView: View {
         .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in
             dismiss()
             modelContext.delete(vehicle)
+            modelContext.saveNow()
         }
     }
 

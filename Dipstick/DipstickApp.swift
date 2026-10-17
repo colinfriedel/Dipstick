@@ -33,11 +33,17 @@ struct DipstickApp: App {
         }
     }()
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             VehicleListView()
                 .environment(TripRecorder.shared)
         }
         .modelContainer(Self.modelContainer)
+        .onChange(of: scenePhase) {
+            // Swiping the app away (or iOS closing it) can skip autosave.
+            if scenePhase != .active { Self.modelContainer.mainContext.saveNow() }
+        }
     }
 }

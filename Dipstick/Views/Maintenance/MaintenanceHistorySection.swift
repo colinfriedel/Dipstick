@@ -72,6 +72,7 @@ struct MaintenanceHistorySection: View {
                     .swipeActions {
                         Button("Delete", role: .destructive) {
                             modelContext.delete(entry)
+                            modelContext.saveNow()
                         }
                         .tint(Theme.red)
                     }

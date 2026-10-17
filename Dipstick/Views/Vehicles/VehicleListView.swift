@@ -130,6 +130,7 @@ struct VehicleListView: View {
             #endif
             .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in
                 modelContext.delete(vehicle)
+                modelContext.saveNow()
             }
         }
         .tint(Theme.accent)

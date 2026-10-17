@@ -281,6 +281,7 @@ struct FuelEntryFormView: View {
             target.vehicle = vehicle
         }
         vehicle.recordOdometer(odometerValue)
+        modelContext.saveNow()
         onClose()
     }
 
