@@ -47,6 +47,9 @@ struct MaintenanceEntryFormView: View {
         var quantity: Int = 1
         /// Price of one.
         var cost: String = ""
+        /// True when `cost` was worked out from the total cost rather than
+        /// typed, so it follows the total and quantity until typed over.
+        var costIsDerived = false
 
         var lineTotal: Double { (Units.parseDecimal(cost) ?? 0) * Double(quantity) }
     }
@@ -119,8 +122,24 @@ struct MaintenanceEntryFormView: View {
     private var costText: Binding<String> {
         Binding(
             get: { manualCost ?? (partsTotal > 0 ? Self.money(partsTotal) : "") },
-            set: { manualCost = $0.isEmpty ? nil : $0 }
+            set: {
+                manualCost = $0.isEmpty ? nil : $0
+                deriveSinglePartPrice()
+            }
         )
+    }
+
+    /// With exactly one part and no price typed for it, a total typed at the
+    /// top fills in the part's price each (total ÷ quantity).
+    private func deriveSinglePartPrice() {
+        guard parts.count == 1, parts[0].cost.isEmpty || parts[0].costIsDerived else { return }
+        if let manualCost, let total = Units.parseDecimal(manualCost), total > 0 {
+            parts[0].cost = Self.money(total / Double(parts[0].quantity))
+            parts[0].costIsDerived = true
+        } else if parts[0].costIsDerived {
+            parts[0].cost = ""
+            parts[0].costIsDerived = false
+        }
     }
 
     private var parsedCost: Double? {
@@ -204,7 +223,7 @@ struct MaintenanceEntryFormView: View {
                 }
                 .padding(.top, 6)
                 partsPanel
-                if manualCost != nil, partsTotal > 0 {
+                if manualCost != nil, partsTotal > 0, abs((parsedCost ?? 0) - partsTotal) > 0.005 {
                     Button("Parts add up to \(Units.currency(partsTotal)). Use parts total") { manualCost = nil }
                         .font(.dipstick(12, relativeTo: .caption))
                         .foregroundStyle(Theme.muted)
@@ -235,6 +254,7 @@ struct MaintenanceEntryFormView: View {
         .tint(Theme.accent)
         .onAppear { if !isEditing { prefillInterval() } }
         .onChange(of: serviceChoice) { if !isEditing { prefillInterval() } }
+        .onChange(of: parts.first?.quantity) { if manualCost != nil { deriveSinglePartPrice() } }
         .task {
             if !isEditing { await focusAfterPresentation { odometerFocused = true } }
         }
@@ -548,8 +568,16 @@ private struct PartRow: View {
         .accessibilityLabel(label)
     }
 
+    /// Typing a price stops it following the total cost.
+    private var typedCost: Binding<String> {
+        Binding(
+            get: { part.cost },
+            set: { part.cost = $0; part.costIsDerived = false }
+        )
+    }
+
     private var costField: some View {
-        TextField(part.quantity > 1 ? "Price each" : "Price", text: $part.cost,
+        TextField(part.quantity > 1 ? "Price each" : "Price", text: typedCost,
                   prompt: Text(part.quantity > 1 ? "$ each" : "$0.00").foregroundStyle(Theme.faint))
             .font(.readout(15, relativeTo: .body))
             .foregroundStyle(Theme.text)
