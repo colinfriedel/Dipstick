@@ -46,7 +46,9 @@ struct RecordCSVTests {
         ]
         let services = [
             RecordCSV.ServiceRow(date: date(2026, 9, 2), odometer: 55_190, serviceType: "Oil change", cost: 48.5,
-                                 parts: [.init(name: "Oil filter", cost: 9.99), .init(name: "Drain plug gasket", cost: 0)],
+                                 parts: [.init(name: "Oil filter", cost: 9.99), .init(name: "Drain plug gasket", cost: 0),
+                                         .init(name: "Brake fluid", cost: 6.3, partNumber: "08798-9008A", quantity: 2),
+                                         .init(name: "Cabin filter", cost: 3.33, quantity: 3)],
                                  nextDueOdometer: 60_190, nextDueDate: date(2027, 3, 2), notes: "Said \"looks good\""),
         ]
         let text = RecordCSV.encode(fuel: fuel, services: services, calendar: calendar)
@@ -56,6 +58,17 @@ struct RecordCSVTests {
         #expect(parsed.problems.isEmpty)
         #expect(parsed.fuel == fuel.sorted { $0.odometer < $1.odometer })
         #expect(parsed.services == services)
+    }
+
+    @Test func partsReadNumberAndQuantityAndSplitTheCost() {
+        let text = "\(header)\nservice,2026-10-17,56500,,12.60,,,Brake fluid flush,"
+            + "\"Honda brake fluid #08798-9008A x2=12.60; MaxLife 5W-20 5qt=24.50; Shop rag ×3\",,,"
+        let parts = RecordCSV.decode(text, calendar: calendar).services.first?.parts
+        #expect(parts == [
+            .init(name: "Honda brake fluid", cost: 6.3, partNumber: "08798-9008A", quantity: 2),
+            .init(name: "MaxLife 5W-20 5qt", cost: 24.5),
+            .init(name: "Shop rag", cost: 0, quantity: 3),
+        ])
     }
 
     @Test func blankCostMeansUnknown() {

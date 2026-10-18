@@ -22,7 +22,7 @@ type,date,odometer,gallons,total_cost,full_tank,station,service,parts,next_due_o
 | `full_tank` | fuel | `yes` or `no` | Fuel only; `no` = partial fill. Blank for service. |
 | `station` | fuel | text | Optional. |
 | `service` | service | text | Required for service. Use one of the standard names below when it fits; otherwise any name. |
-| `parts` | service | `Name=cost; Name=cost` | Optional. Separate parts with `;`. Cost is optional (`Oil filter=9.99; Drain plug gasket`). |
+| `parts` | service | `Name #part-number x2=cost; Name=cost` | Optional. Separate parts with `;`. Part number (`#…`), quantity (`x2`) and cost are optional; the cost is for all of them (`Oil filter=9.99; Brake fluid #08798-9008A x2=12.60; Drain plug gasket`). |
 | `next_due_odometer` | service | whole number | Optional. The odometer reading when this service is next due (not the interval). |
 | `next_due_date` | service | `YYYY-MM-DD` | Optional. The date this service is next due. |
 | `notes` | both | text | Optional. |

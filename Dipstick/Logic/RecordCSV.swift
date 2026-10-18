@@ -29,7 +29,10 @@ enum RecordCSV {
 
     struct Part: Equatable {
         var name: String
+        /// Price of one.
         var cost: Double
+        var partNumber: String? = nil
+        var quantity: Int = 1
     }
 
     struct ServiceRow: Equatable {
@@ -110,7 +113,11 @@ enum RecordCSV {
 
     private static func partsText(_ parts: [Part]) -> String {
         let items: [String] = parts.map { part in
-            part.cost > 0 ? part.name + "=" + number(part.cost, decimals: 2) : part.name
+            var label = part.name
+            if let partNumber = part.partNumber, !partNumber.isEmpty { label += " #" + partNumber }
+            if part.quantity > 1 { label += " x\(part.quantity)" }
+            let lineTotal = part.cost * Double(part.quantity)
+            return lineTotal > 0 ? label + "=" + number(lineTotal, decimals: 2) : label
         }
         return items.joined(separator: "; ")
     }
@@ -330,22 +337,43 @@ enum RecordCSV {
         String(format: "%.\(decimals)f", locale: Locale(identifier: "en_US_POSIX"), value)
     }
 
-    /// "Oil filter=9.99; Drain plug gasket" → parts. nil if a cost isn't a number.
+    /// "Oil filter=9.99; Brake fluid #08798-9008A x2=12.60; Drain plug gasket"
+    /// → parts. The amount is the line total (all of them), so it's divided by
+    /// the quantity. nil if an amount isn't a number.
     private static func parseParts(_ text: String) -> [Part]? {
         var parts: [Part] = []
         for item in text.split(separator: ";") {
             let pieces = item.split(separator: "=", maxSplits: 1).map {
                 $0.trimmingCharacters(in: .whitespaces)
             }
-            guard let name = pieces.first, !name.isEmpty else { continue }
-            var cost = 0.0
+            guard let label = pieces.first, !label.isEmpty else { continue }
+            var part = parseLabel(label)
             if pieces.count == 2, !pieces[1].isEmpty {
-                guard let parsed = Units.parseDecimal(pieces[1]), parsed >= 0 else { return nil }
-                cost = parsed
+                guard let total = Units.parseDecimal(pieces[1]), total >= 0 else { return nil }
+                part.cost = (total / Double(part.quantity) * 10_000).rounded() / 10_000
             }
-            parts.append(Part(name: name, cost: cost))
+            parts.append(part)
         }
         return parts
+    }
+
+    /// "Brake fluid #08798-9008A x2" → name, part number and quantity. The
+    /// quantity ("x2" or "×2") and part number ("#…") are only read from the
+    /// end, and only if a name is left before them.
+    private static func parseLabel(_ label: String) -> Part {
+        var words = label.split(whereSeparator: \.isWhitespace).map(String.init)
+        var quantity = 1
+        if words.count > 1, let last = words.last, let first = last.first, first == "x" || first == "×" || first == "X",
+           let count = Int(last.dropFirst()), count > 0 {
+            quantity = count
+            words.removeLast()
+        }
+        var partNumber: String?
+        if words.count > 1, let last = words.last, last.hasPrefix("#"), last.count > 1 {
+            partNumber = String(last.dropFirst())
+            words.removeLast()
+        }
+        return Part(name: words.joined(separator: " "), cost: 0, partNumber: partNumber, quantity: quantity)
     }
 }
 
@@ -364,7 +392,9 @@ extension Vehicle {
             },
             services: (maintenanceEntries ?? []).map {
                 .init(date: $0.date, odometer: $0.odometer, serviceType: $0.serviceType, cost: $0.cost,
-                      parts: $0.sortedParts.map { .init(name: $0.name, cost: $0.cost) },
+                      parts: $0.sortedParts.map {
+                          .init(name: $0.name, cost: $0.cost, partNumber: $0.partNumber, quantity: $0.quantity)
+                      },
                       nextDueOdometer: $0.nextDueOdometer, nextDueDate: $0.nextDueDate, notes: $0.notes)
             }
         )
@@ -408,7 +438,8 @@ extension Vehicle {
             context.insert(entry)
             entry.vehicle = self
             for part in row.parts {
-                let model = PartUsed(name: part.name, cost: part.cost)
+                let model = PartUsed(name: part.name, cost: part.cost,
+                                     partNumber: part.partNumber, quantity: part.quantity)
                 context.insert(model)
                 model.entry = entry
             }

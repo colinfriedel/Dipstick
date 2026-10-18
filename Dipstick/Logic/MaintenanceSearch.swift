@@ -8,7 +8,7 @@ import Foundation
 /// Search and filter rules for the maintenance history.
 enum MaintenanceSearch {
     /// True if the record matches the service-type filter (nil = all types)
-    /// and every word of the query appears in its type, notes or part names.
+    /// and every word of the query appears in its type, notes, part names or part numbers.
     static func matches(
         serviceType: String,
         notes: String?,
@@ -31,7 +31,7 @@ extension MaintenanceEntry {
         MaintenanceSearch.matches(
             serviceType: serviceType,
             notes: notes,
-            partNames: (parts ?? []).map(\.name),
+            partNames: (parts ?? []).flatMap { [$0.name, $0.partNumber ?? ""] },
             query: query,
             typeFilter: typeFilter
         )

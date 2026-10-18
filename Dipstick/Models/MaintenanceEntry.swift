@@ -51,11 +51,24 @@ final class MaintenanceEntry {
 @Model
 final class PartUsed {
     var name: String = ""
+    /// Price of one; the line costs `cost × quantity`.
     var cost: Double = 0
+    /// Manufacturer part number, e.g. "08798-9008A".
+    var partNumber: String?
+    var quantity: Int = 1
     var entry: MaintenanceEntry?
 
-    init(name: String, cost: Double = 0) {
+    init(name: String, cost: Double = 0, partNumber: String? = nil, quantity: Int = 1) {
         self.name = name
         self.cost = cost
+        self.partNumber = partNumber
+        self.quantity = max(quantity, 1)
+    }
+
+    var lineTotal: Double { cost * Double(max(quantity, 1)) }
+
+    /// "Brake fluid ×2", or just the name for one.
+    var summary: String {
+        quantity > 1 ? "\(name) ×\(quantity)" : name
     }
 }

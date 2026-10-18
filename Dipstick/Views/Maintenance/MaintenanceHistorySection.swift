@@ -176,7 +176,7 @@ private struct MaintenanceEntryRow: View {
 
     /// Parts used, or the notes when there are no parts.
     private var detail: String? {
-        let parts = entry.sortedParts.map(\.name)
+        let parts = entry.sortedParts.map(\.summary)
         if !parts.isEmpty { return parts.joined(separator: ", ") }
         return entry.notes
     }

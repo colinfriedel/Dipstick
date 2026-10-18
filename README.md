@@ -2,14 +2,13 @@
 
 A personal iPhone app for tracking fuel fill-ups and maintenance on my cars, with automatic MPG calculation and city/highway driving detection.
 
-> **Status: in development.** I use it day to day on my own cars. Some features are still being road-tested (marked below). It is also purely functional at this point, visual and style aspects have not been designed or implemented yet.
+> **Status: in development.** I use it day to day on my own cars. Some features are still being road-tested (marked below).
 
-<!-- Screenshots: add 2–4 here, e.g. home screen, fuel log, stats chart, recording screen. -->
 <p>
-  <img src="docs/screenshots/home.png" width="200" alt="Home screen">
-  <img src="docs/screenshots/fuel.png" width="200" alt="Fuel log">
-  <img src="docs/screenshots/mpg.png" width="200" alt="Stats">
-  <img src="docs/screenshots/trips.png" width="200" alt="Trip recording">
+  <img src="docs/screenshots/home.png" width="200" alt="Home screen with three cars, their MPG gauges and odometers, and service lamps">
+  <img src="docs/screenshots/fuel.png" width="200" alt="Fuel tab with recent, all-time and cost-per-mile readouts and the fill-up log">
+  <img src="docs/screenshots/maintenance.png" width="200" alt="Maintenance tab with search, service-type filters and service history">
+  <img src="docs/screenshots/stats.png" width="200" alt="Stats tab with city, highway and combined MPG, current tank, MPG chart and fuel spend">
 </p>
 
 ## Why
@@ -21,7 +20,7 @@ My maintenance records were spread across paper notebooks and iPhone Notes, and 
 **Working**
 - **Multiple vehicles** with year/make/model, VIN and odometer
 - **Fuel log** with automatic MPG between full tanks (partial fills roll into the next full tank), miles per tank, last-tank and average MPG
-- **Maintenance log** with parts and costs, labor/shop totals, search and filtering by service type
+- **Maintenance log** with parts (part numbers, quantities, costs), labor/shop totals, search and filtering by service type
 - **Service reminders**: "next due" by miles and/or time, with a due-soon and overdue list across all cars on the home screen
 - **Stats**: MPG trend chart, monthly fuel spend, cost per mile
 - **CSV import/export** for bringing in existing records and backing up
@@ -35,7 +34,6 @@ My maintenance records were spread across paper notebooks and iPhone Notes, and 
 **Planned**
 - iCloud sync
 - Importing maintenance schedules from owner's manuals
-- Visual redesign
 
 ## Tech
 

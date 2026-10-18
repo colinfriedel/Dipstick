@@ -66,13 +66,23 @@ struct ServiceTypeTests {
     }
 }
 
+struct PartUsedTests {
+    @Test func lineTotalAndSummaryUseQuantity() {
+        let fluid = PartUsed(name: "Brake fluid", cost: 6.3, partNumber: "08798-9008A", quantity: 2)
+        #expect(fluid.lineTotal == 12.6)
+        #expect(fluid.summary == "Brake fluid ×2")
+        #expect(PartUsed(name: "Oil filter", cost: 9).summary == "Oil filter")
+        #expect(PartUsed(name: "Bolt", quantity: 0).quantity == 1)
+    }
+}
+
 @MainActor
 struct MaintenanceSearchTests {
     private func matches(_ query: String, type: String? = nil) -> Bool {
         MaintenanceSearch.matches(
             serviceType: "Oil change",
             notes: "Used Mobil 1 5W-30",
-            partNames: ["Oil filter", "Drain plug gasket"],
+            partNames: ["Oil filter", "Drain plug gasket", "08798-9008A"],
             query: query,
             typeFilter: type
         )
@@ -88,6 +98,7 @@ struct MaintenanceSearchTests {
         #expect(matches("mobil"))
         #expect(matches("gasket"))
         #expect(!matches("brake"))
+        #expect(matches("08798"))
     }
 
     @Test func everyWordMustMatchSomewhere() {

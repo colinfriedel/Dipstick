@@ -42,12 +42,17 @@ struct MaintenanceEntryFormView: View {
 
     struct PartDraft: Identifiable {
         let id = UUID()
-        var name: String
-        var cost: String
+        var name: String = ""
+        var partNumber: String = ""
+        var quantity: Int = 1
+        /// Price of one.
+        var cost: String = ""
+
+        var lineTotal: Double { (Units.parseDecimal(cost) ?? 0) * Double(quantity) }
     }
 
     enum PartField: Hashable {
-        case name(UUID), cost(UUID)
+        case name(UUID), number(UUID), cost(UUID)
     }
 
     /// - Parameter serviceType: preselects the service when logging a new one
@@ -64,9 +69,10 @@ struct MaintenanceEntryFormView: View {
 
         let existingParts = entry?.sortedParts ?? []
         _parts = State(initialValue: existingParts.map {
-            PartDraft(name: $0.name, cost: $0.cost > 0 ? Self.money($0.cost) : "")
+            PartDraft(name: $0.name, partNumber: $0.partNumber ?? "", quantity: max($0.quantity, 1),
+                      cost: $0.cost > 0 ? Self.money($0.cost) : "")
         })
-        let partsSum = existingParts.reduce(0) { $0 + $1.cost }
+        let partsSum = existingParts.reduce(0) { $0 + $1.lineTotal }
         if let entry, abs(entry.cost - partsSum) > 0.005 {
             _manualCost = State(initialValue: Self.money(entry.cost))
         } else {
@@ -107,7 +113,7 @@ struct MaintenanceEntryFormView: View {
     // MARK: Cost
 
     private var partsTotal: Double {
-        parts.reduce(0) { $0 + (Units.parseDecimal($1.cost) ?? 0) }
+        parts.reduce(0) { $0 + $1.lineTotal }
     }
 
     private var costText: Binding<String> {
@@ -278,39 +284,13 @@ struct MaintenanceEntryFormView: View {
     private var partsPanel: some View {
         VStack(spacing: 0) {
             ForEach($parts) { $part in
-                HStack(spacing: 10) {
-                    TextField("Part name", text: $part.name,
-                              prompt: Text("Part name").foregroundStyle(Theme.faint))
-                        .font(.dipstick(15, .semibold, relativeTo: .body))
-                        .foregroundStyle(Theme.text)
-                        .focused($focusedPart, equals: .name(part.id))
-                    TextField("$0.00", text: $part.cost,
-                              prompt: Text("$0.00").foregroundStyle(Theme.faint))
-                        .font(.readout(15, relativeTo: .body))
-                        .foregroundStyle(Theme.text)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 80)
-                        .focused($focusedPart, equals: .cost(part.id))
-                    Button {
-                        parts.removeAll { $0.id == part.id }
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Theme.muted)
-                            .frame(width: 36, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Remove \(part.name.isEmpty ? "part" : part.name)")
+                PartRow(part: $part, focusedPart: $focusedPart) {
+                    parts.removeAll { $0.id == part.id }
                 }
-                .padding(.leading, 16)
-                .padding(.trailing, 6)
-                .frame(minHeight: 52)
                 FormDivider()
             }
             Button {
-                let draft = PartDraft(name: "", cost: "")
+                let draft = PartDraft()
                 parts.append(draft)
                 focusedPart = .name(draft.id)
             } label: {
@@ -440,9 +420,11 @@ struct MaintenanceEntryFormView: View {
         }
         for draft in parts {
             let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let partNumber = nilIfBlank(draft.partNumber)
             let cost = Units.parseDecimal(draft.cost) ?? 0
-            guard !name.isEmpty || cost > 0 else { continue }
-            let part = PartUsed(name: name.isEmpty ? "Part" : name, cost: cost)
+            guard !name.isEmpty || partNumber != nil || cost > 0 else { continue }
+            let part = PartUsed(name: name.isEmpty ? "Part" : name, cost: cost,
+                                partNumber: partNumber, quantity: draft.quantity)
             modelContext.insert(part)
             part.entry = target
         }
@@ -459,5 +441,121 @@ struct MaintenanceEntryFormView: View {
 
     private static func money(_ value: Double) -> String {
         String(format: "%.2f", value)
+    }
+}
+
+/// One part in the service form: name on top; part number, quantity and the
+/// price of one underneath. Shows the line total once there's more than one.
+private struct PartRow: View {
+    @Binding var part: MaintenanceEntryFormView.PartDraft
+    var focusedPart: FocusState<MaintenanceEntryFormView.PartField?>.Binding
+    let onRemove: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 10) {
+                TextField("Part name", text: $part.name,
+                          prompt: Text("Part name").foregroundStyle(Theme.faint))
+                    .font(.dipstick(15, .semibold, relativeTo: .body))
+                    .foregroundStyle(Theme.text)
+                    .focused(focusedPart, equals: .name(part.id))
+                Button(action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.muted)
+                        .frame(width: 36, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove \(part.name.isEmpty ? "part" : part.name)")
+            }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    numberField
+                    quantityControl
+                    costField.frame(width: 84)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    numberField
+                    HStack(spacing: 10) {
+                        quantityControl
+                        Spacer(minLength: 0)
+                        costField
+                    }
+                }
+            }
+            .padding(.trailing, 10)
+            if part.quantity > 1, part.lineTotal > 0 {
+                Text("\(part.quantity) × \(Units.currency(part.lineTotal / Double(part.quantity))) = \(Units.currency(part.lineTotal))")
+                    .font(.readout(12, relativeTo: .caption))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 10)
+                    .padding(.top, 2)
+            }
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, 6)
+        .padding(.bottom, 10)
+    }
+
+    private var numberField: some View {
+        TextField("Part number", text: $part.partNumber,
+                  prompt: Text("Part #").foregroundStyle(Theme.faint))
+            .font(.readout(14, relativeTo: .body))
+            .foregroundStyle(Theme.text)
+            .textInputAutocapitalization(.characters)
+            .autocorrectionDisabled()
+            .frame(minHeight: 36)
+            .focused(focusedPart, equals: .number(part.id))
+    }
+
+    private var quantityControl: some View {
+        HStack(spacing: 0) {
+            stepButton("minus", label: "One fewer", enabled: part.quantity > 1) { part.quantity -= 1 }
+            Text("×\(part.quantity)")
+                .font(.readout(15, relativeTo: .body))
+                .foregroundStyle(Theme.text)
+                .monospacedDigit()
+                .frame(minWidth: 30)
+                .accessibilityHidden(true)
+            stepButton("plus", label: "One more", enabled: part.quantity < 99) { part.quantity += 1 }
+        }
+        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.selectedFill))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.selectedBorder, lineWidth: 1))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Quantity")
+        .accessibilityValue("\(part.quantity)")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: if part.quantity < 99 { part.quantity += 1 }
+            case .decrement: if part.quantity > 1 { part.quantity -= 1 }
+            @unknown default: break
+            }
+        }
+    }
+
+    private func stepButton(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(enabled ? Theme.text : Theme.faint)
+                .frame(width: 34, height: 36)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+    }
+
+    private var costField: some View {
+        TextField(part.quantity > 1 ? "Price each" : "Price", text: $part.cost,
+                  prompt: Text(part.quantity > 1 ? "$ each" : "$0.00").foregroundStyle(Theme.faint))
+            .font(.readout(15, relativeTo: .body))
+            .foregroundStyle(Theme.text)
+            .keyboardType(.decimalPad)
+            .multilineTextAlignment(.trailing)
+            .frame(minHeight: 36)
+            .focused(focusedPart, equals: .cost(part.id))
     }
 }
