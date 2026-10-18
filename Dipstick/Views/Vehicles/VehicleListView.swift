@@ -8,8 +8,8 @@ import SwiftData
 
 /// Home screen (design board C1a / M): a card per car with its last-tank MPG
 /// gauge, due count and odometer, then the "service lamps" list of everything
-/// due soon or overdue. Tap a card for its details; the pump button logs a
-/// fill-up. Swipe a card right to log a fill-up or service, left to delete.
+/// due soon or overdue. Tap a card for its details. Swipe a card right to log
+/// a fill-up (opens the pump scanner) or service, left to delete.
 struct VehicleListView: View {
     /// A request to log a service, optionally for a specific service type.
     struct ServiceRequest: Identifiable {
@@ -60,9 +60,7 @@ struct VehicleListView: View {
                 } else {
                     SmallCapsLabel("Vehicles").plainRow(top: 0, bottom: 4)
                     ForEach(vehicles) { vehicle in
-                        VehicleCard(vehicle: vehicle) {
-                            vehicleToFuel = vehicle
-                        }
+                        VehicleCard(vehicle: vehicle)
                         .contentShape(Rectangle())
                         .onTapGesture { path.append(vehicle) }
                         .accessibilityAddTraits(.isButton)
@@ -169,57 +167,59 @@ struct VehicleListView: View {
     }
 }
 
-/// One car on Home: gauge, name with due count, model line, odometer, and the
-/// icon-only fill-up button.
+/// One car on Home: gauge, name with due count, model line, odometer. Swipe
+/// the card right to log a fill-up or service.
 private struct VehicleCard: View {
     let vehicle: Vehicle
-    let onFillUp: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        let dueCount = vehicle.maintenanceDueItems().filter { $0.status != .ok }.count
-
-        HStack(spacing: 12) {
-            MPGGauge(mpg: vehicle.mpgSummary.latest, size: 84)
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 7) {
-                    vehicle.chip
-                    Text(vehicle.name.uppercased())
-                        .font(.dipstick(17, .semibold, relativeTo: .headline))
-                        .tracking(2)
-                        .foregroundStyle(Theme.text)
-                        .lineLimit(1)
-                    if dueCount > 0 {
-                        CountPill(count: dueCount)
-                    }
+        let gauge = MPGGauge(mpg: vehicle.mpgSummary.latest, size: 84)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                // Large text: gauge on top, details full width below.
+                VStack(alignment: .leading, spacing: 10) {
+                    gauge
+                    details
                 }
-                if !vehicle.yearMakeModel.isEmpty {
-                    Text(vehicle.yearMakeModel)
-                        .font(.dipstick(13, relativeTo: .footnote))
-                        .foregroundStyle(Theme.muted)
-                        .lineLimit(1)
+            } else {
+                HStack(spacing: 12) {
+                    gauge
+                    details.frame(maxWidth: .infinity, alignment: .leading)
                 }
-                OdometerView(miles: vehicle.currentOdometer, size: 22)
-                    .padding(.top, 3)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button(action: onFillUp) {
-                Image(systemName: "fuelpump")
-                    .font(.system(size: 30, weight: .light))
-                    .frame(width: 68, height: 68)
-                    .background(RoundedRectangle(cornerRadius: Theme.Radius.button).fill(Theme.controlFill))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.button)
-                        .strokeBorder(Theme.controlBorder, lineWidth: 1.5))
-                    .foregroundStyle(Theme.text)
-            }
-            .buttonStyle(.borderless)
-            .accessibilityLabel("Log fill-up for \(vehicle.name)")
         }
         .padding(12)
         .frame(minHeight: 108)
         .panel()
         .accessibilityElement(children: .contain)
+    }
+
+    private var details: some View {
+        let dueCount = vehicle.maintenanceDueItems().filter { $0.status != .ok }.count
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 7) {
+                vehicle.chip
+                Text(vehicle.name.uppercased())
+                    .font(.dipstick(17, .semibold, relativeTo: .headline))
+                    .tracking(2)
+                    .foregroundStyle(Theme.text)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+                    .minimumScaleFactor(0.8)
+                if dueCount > 0 {
+                    CountPill(count: dueCount)
+                }
+            }
+            if !vehicle.yearMakeModel.isEmpty {
+                Text(vehicle.yearMakeModel)
+                    .font(.dipstick(13, relativeTo: .footnote))
+                    .foregroundStyle(Theme.muted)
+                    .lineLimit(2)
+            }
+            OdometerView(miles: vehicle.currentOdometer, size: 22)
+                .padding(.top, 3)
+        }
     }
 }
 
@@ -252,10 +252,14 @@ private struct ServiceLampsPanel: View {
 
 private struct ServiceLampRow: View {
     let row: VehicleListView.DueRow
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         let item = row.item
-        HStack(spacing: 12) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 12))
+        layout {
             Image(systemName: item.status.icon)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(item.status.tint)
@@ -273,14 +277,14 @@ private struct ServiceLampRow: View {
                         .font(.dipstick(10, .semibold, relativeTo: .caption2))
                         .tracking(1)
                         .foregroundStyle(Theme.muted)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                         .minimumScaleFactor(0.8)
                 }
             }
 
-            Spacer(minLength: 8)
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
 
-            VStack(alignment: .trailing, spacing: 3) {
+            VStack(alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing, spacing: 3) {
                 Text(item.shortSummary.uppercased())
                     .font(.readout(12, relativeTo: .caption))
                     .foregroundStyle(item.status.tint)
