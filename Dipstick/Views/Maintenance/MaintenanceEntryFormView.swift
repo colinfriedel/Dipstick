@@ -177,7 +177,7 @@ struct MaintenanceEntryFormView: View {
                 OdometerField(text: $odometer, focus: $odometerFocused, size: 24)
                     .padding(.top, 4)
 
-                HStack(spacing: 10) {
+                TileRow {
                     dateTile
                     NumberTileField(label: "Total cost", text: costText, placeholder: "$0.00",
                                     prefix: "$", size: 24, focus: $costFocused)
@@ -316,7 +316,7 @@ struct MaintenanceEntryFormView: View {
             } label: {
                 Label("Add part", systemImage: "plus")
                     .font(.dipstick(14, .semibold, relativeTo: .body))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.accentText)
                     .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
                     .padding(.horizontal, 16)
                     .contentShape(Rectangle())
@@ -328,7 +328,7 @@ struct MaintenanceEntryFormView: View {
 
     private var nextDuePanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+            TileRow {
                 NumberTileField(label: "Every", text: $everyMiles, placeholder: "—",
                                 unit: "mi", keyboard: .numberPad, size: 22, height: 66, focus: $milesFocused)
                 NumberTileField(label: "Or every", text: $everyMonths, placeholder: "—",

@@ -27,6 +27,7 @@ struct VehicleFormView: View {
     @State private var connectionMessage: String?
 
     @FocusState private var focused: Field?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @FocusState private var odometerFocused: Bool
 
     private enum Field { case name, year, make, model, vin, colorName }
@@ -101,10 +102,10 @@ struct VehicleFormView: View {
                 textPanel("Nickname", text: $name, field: .name, focusRing: true)
                     .textInputAutocapitalization(.words)
 
-                HStack(spacing: 10) {
+                TileRow {
                     textPanel("Year", text: $year, field: .year, mono: true)
                         .keyboardType(.numberPad)
-                        .frame(width: 96)
+                        .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : 96)
                     textPanel("Make", text: $make, field: .make)
                         .textInputAutocapitalization(.words)
                     textPanel("Model", text: $model, field: .model)
@@ -312,7 +313,7 @@ struct VehicleFormView: View {
                     } label: {
                         Label("Add current connection", systemImage: "plus")
                             .font(.dipstick(14, .semibold, relativeTo: .body))
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.accentText)
                             .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
                             .padding(.horizontal, 16)
                             .contentShape(Rectangle())

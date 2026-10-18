@@ -54,6 +54,10 @@ enum Theme {
     /// The one accent color. App-wide; a Settings screen can change it later
     /// (alternates in the spec: 0x4FD1C5, 0x7CA8FF, 0xFFB000).
     static let accent = Color(hex: 0xFF6A2B)
+    /// Small accent-colored text (links like "Add part"). The accent is too
+    /// light for small text on white, so light mode uses the text color
+    /// (light spec: "do not use the accent for small body text").
+    static let accentText = Color(light: 0x14181F, dark: 0xFF6A2B)
     /// Text on accent-filled buttons, in both modes.
     static let onAccent = Color(hex: 0x07080A)
 

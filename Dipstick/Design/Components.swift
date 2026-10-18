@@ -442,6 +442,9 @@ struct TabSwitch<Tab: Hashable & Identifiable>: View {
                     Text(title(tab))
                         .font(.dipstick(14, .semibold, relativeTo: .subheadline))
                         .foregroundStyle(isSelected ? Theme.text : Theme.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .padding(.horizontal, 4)
                         .frame(maxWidth: .infinity, minHeight: 40)
                         .background(RoundedRectangle(cornerRadius: 11)
                             .fill(isSelected ? Theme.selectedFill : Color.clear))
@@ -455,5 +458,22 @@ struct TabSwitch<Tab: Hashable & Identifiable>: View {
         }
         .padding(4)
         .panel(radius: 14)
+    }
+}
+
+// MARK: - Large text
+
+/// Lays out side-by-side tiles in a row, or stacked at accessibility text
+/// sizes so big numbers don't get squeezed or cut off.
+struct TileRow<Content: View>: View {
+    var spacing: CGFloat = 10
+    @ViewBuilder let content: Content
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: spacing))
+            : AnyLayout(HStackLayout(spacing: spacing))
+        layout { content }
     }
 }

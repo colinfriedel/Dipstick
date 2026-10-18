@@ -33,7 +33,7 @@ struct FuelHistorySection: View {
         let lastTank = MPGCalculator.latest(in: fills, results: mpgResults)
 
         Section {
-            HStack(spacing: 10) {
+            TileRow {
                 ReadoutTile("Recent") { MPGReadout(value: stats.recentMPG) }
                 ReadoutTile("All-time", highlighted: true) {
                     MPGReadout(value: stats.averageMPG, color: Theme.accent)

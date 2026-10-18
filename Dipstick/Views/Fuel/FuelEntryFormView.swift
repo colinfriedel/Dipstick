@@ -126,7 +126,7 @@ struct FuelEntryFormView: View {
                 OdometerField(text: $odometer, focus: $odometerFocused)
                 odometerProblem
 
-                HStack(spacing: 10) {
+                TileRow {
                     NumberTileField(label: "Gallons", text: $gallons, placeholder: "0.000",
                                     unit: "gal", focus: $gallonsFocused)
                     NumberTileField(label: "Total cost", text: $totalCost, placeholder: "$0.00",

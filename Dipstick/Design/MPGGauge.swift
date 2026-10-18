@@ -51,6 +51,7 @@ struct MPGGauge: View {
             }
         }
         .frame(width: size, height: size)
+        .dynamicTypeSize(.large)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(mpg.map { "Last tank \(String(format: "%.1f", $0)) miles per gallon" } ?? "No MPG yet")
     }

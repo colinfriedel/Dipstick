@@ -39,6 +39,9 @@ struct DipstickApp: App {
         WindowGroup {
             VehicleListView()
                 .environment(TripRecorder.shared)
+                // Supports large accessibility sizes; the two very largest
+                // make number readouts unusable on a phone screen.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility3)
         }
         .modelContainer(Self.modelContainer)
         .onChange(of: scenePhase) {

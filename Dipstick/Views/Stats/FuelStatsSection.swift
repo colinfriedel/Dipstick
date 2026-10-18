@@ -38,7 +38,7 @@ struct FuelStatsSection: View {
         let hasTrips = !(vehicle.trips ?? []).isEmpty
 
         Section {
-            HStack(spacing: 10) {
+            TileRow {
                 ReadoutTile("City") { MPGReadout(value: estimate?.cityMPG) }
                 ReadoutTile("Highway") { MPGReadout(value: estimate?.highwayMPG) }
                 ReadoutTile("Combined", highlighted: true) {

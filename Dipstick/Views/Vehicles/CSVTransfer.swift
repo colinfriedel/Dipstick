@@ -93,7 +93,7 @@ struct ImportPreviewView: View {
 
                 fileCard
 
-                HStack(spacing: 10) {
+                TileRow {
                     ReadoutTile("New", highlighted: true, height: 80) {
                         MonoNumber(text: "\(counts[.new] ?? 0)", size: 28, color: Theme.accent)
                     }
