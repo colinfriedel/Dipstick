@@ -37,6 +37,9 @@ final class Vehicle {
     var maintenanceEntries: [MaintenanceEntry]? = []
     @Relationship(deleteRule: .cascade, inverse: \Trip.vehicle)
     var trips: [Trip]? = []
+    /// Factory maintenance schedule from the owner's manual.
+    @Relationship(deleteRule: .cascade, inverse: \ScheduleItem.vehicle)
+    var scheduleItems: [ScheduleItem]? = []
 
     init(
         name: String,

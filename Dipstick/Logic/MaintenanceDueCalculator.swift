@@ -150,7 +150,7 @@ enum MaintenanceDueCalculator {
         .sorted { ($0.status, -$0.urgency) > ($1.status, -$1.urgency) }
     }
 
-    private static func status(left: Int, soon: Int) -> Status {
+    static func status(left: Int, soon: Int) -> Status {
         if left < 0 { return .overdue }
         if left <= soon { return .dueSoon }
         return .ok

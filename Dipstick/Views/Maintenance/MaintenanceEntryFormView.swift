@@ -94,11 +94,12 @@ struct MaintenanceEntryFormView: View {
     // MARK: Service type
 
     /// This car's services first (most recent first), then the rest of the
-    /// built-in and custom names, then Custom….
+    /// built-in, scheduled and custom names, then Custom….
     private var serviceOptions: [String] {
         var seen = Set<String>()
         let mine = (vehicle.maintenanceEntries ?? []).sorted { $0.date > $1.date }.map(\.serviceType)
-        let all = mine + ServiceType.options(addingUsed: allEntries.map(\.serviceType))
+        let scheduled = vehicle.sortedScheduleItems.map(\.serviceType)
+        let all = mine + ServiceType.options(addingUsed: allEntries.map(\.serviceType) + scheduled)
         var options = all.filter { seen.insert($0.lowercased()).inserted }
         if !options.contains(where: { $0.caseInsensitiveCompare(serviceChoice) == .orderedSame }),
            serviceChoice != Self.customChoice {
@@ -390,8 +391,8 @@ struct MaintenanceEntryFormView: View {
 
     // MARK: Interval prefill
 
-    /// Offer the interval used last time for this service on this vehicle,
-    /// without overwriting anything the user typed.
+    /// Offer the factory schedule's interval for this service, or else the one
+    /// used last time on this vehicle, without overwriting anything typed.
     private func prefillInterval() {
         let current = MaintenanceSchedule.Interval(
             miles: Units.parseWholeNumber(everyMiles),
@@ -402,7 +403,11 @@ struct MaintenanceEntryFormView: View {
         let previous = (vehicle.maintenanceEntries ?? [])
             .filter { $0.serviceType.caseInsensitiveCompare(resolvedServiceType) == .orderedSame }
             .max { $0.date < $1.date }
-        let suggestion = previous.map {
+        let scheduled = vehicle.sortedScheduleItems
+            .first { $0.serviceType.caseInsensitiveCompare(resolvedServiceType) == .orderedSame
+                && ($0.effectiveRule.everyMiles != nil || $0.effectiveRule.everyMonths != nil) }
+            .map { MaintenanceSchedule.Interval(miles: $0.effectiveRule.everyMiles, months: $0.effectiveRule.everyMonths) }
+        let suggestion = scheduled ?? previous.map {
             MaintenanceSchedule.interval(odometer: $0.odometer, date: $0.date, due: $0.due)
         } ?? .init()
 

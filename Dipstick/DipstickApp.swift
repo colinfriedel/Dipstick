@@ -19,6 +19,7 @@ struct DipstickApp: App {
             MaintenanceEntry.self,
             PartUsed.self,
             Trip.self,
+            ScheduleItem.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

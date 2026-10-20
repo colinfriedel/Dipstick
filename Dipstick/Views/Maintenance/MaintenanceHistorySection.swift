@@ -6,8 +6,9 @@
 import SwiftUI
 import SwiftData
 
-/// Maintenance tab of vehicle detail (design board E / O): LOG SERVICE,
-/// search and a filter, a chip row of this car's service types, then every
+/// Maintenance tab of vehicle detail (design board E / O): LOG SERVICE, a
+/// link to the factory schedule, search and a filter, a chip row of this
+/// car's service types (scheduled ones first), then every
 /// record newest first. The latest record of each type shows when it's next
 /// due. Tap a record to edit it, swipe to delete. The parent presents the
 /// sheets (see `FuelHistorySection` for why).
@@ -15,6 +16,7 @@ struct MaintenanceHistorySection: View {
     let vehicle: Vehicle
     let onLog: () -> Void
     let onEdit: (MaintenanceEntry) -> Void
+    let onSchedule: () -> Void
 
     @Environment(\.modelContext) private var modelContext
     @State private var query = ""
@@ -27,10 +29,12 @@ struct MaintenanceHistorySection: View {
         }
     }
 
-    /// This car's service types, most recently done first.
+    /// This car's service types: those on its factory schedule first (in the
+    /// manual's order), then the rest most recently done first.
     private var typesInUse: [String] {
         var seen = Set<String>()
-        return entries.map(\.serviceType).filter { seen.insert($0.lowercased()).inserted }
+        let byRecency = entries.map(\.serviceType).filter { seen.insert($0.lowercased()).inserted }
+        return FactorySchedule.scheduleFirst(byRecency, schedule: vehicle.sortedScheduleItems.map(\.serviceType))
     }
 
     var body: some View {
@@ -47,6 +51,8 @@ struct MaintenanceHistorySection: View {
             }
             .buttonStyle(BigActionButtonStyle(height: 56))
             .plainRow(top: 12, bottom: 8)
+
+            scheduleLink.plainRow(top: 0, bottom: 8)
 
             if !all.isEmpty {
                 searchRow.plainRow(top: 4, bottom: 4)
@@ -79,6 +85,43 @@ struct MaintenanceHistorySection: View {
                 }
             }
         }
+    }
+
+    /// Opens the factory schedule, with how many items need attention.
+    private var scheduleLink: some View {
+        let progress = vehicle.sortedScheduleItems.compactMap { vehicle.scheduleProgress(for: $0) }
+            .filter { !$0.needsRecord }
+        let worst = progress.map(\.status).max() ?? .ok
+        let attention = progress.filter { $0.status != .ok }.count
+        let summary = progress.isEmpty && (vehicle.scheduleItems ?? []).isEmpty
+            ? "Set up"
+            : attention > 0 ? "\(attention) need\(attention == 1 ? "s" : "") attention" : "All on track"
+
+        return Button {
+            isSearching = false
+            onSchedule()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "chart.bar.doc.horizontal")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Theme.muted)
+                Text("Factory schedule")
+                    .font(.dipstick(15, .semibold, relativeTo: .body))
+                    .foregroundStyle(Theme.text)
+                Spacer(minLength: 8)
+                Text(summary)
+                    .font(.dipstick(12, .semibold, relativeTo: .caption))
+                    .foregroundStyle(attention > 0 ? worst.tint : Theme.muted)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.faint)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 52)
+            .panel(radius: Theme.Radius.field)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var searchRow: some View {
@@ -137,7 +180,7 @@ struct MaintenanceHistorySection: View {
     }
 }
 
-private struct MaintenanceEntryRow: View {
+struct MaintenanceEntryRow: View {
     let entry: MaintenanceEntry
     /// Set only when this is the latest record of its service type and it has a
     /// next-due; older records' due dates no longer apply.

@@ -30,6 +30,7 @@ struct VehicleDetailView: View {
     @State private var editingServiceEntry: MaintenanceEntry?
     @State private var log: Log = .fuel
     @State private var isUpdatingOdometer = false
+    @State private var isShowingSchedule = false
     @State private var isImporting = false
     @State private var importFile: ImportFile?
     @State private var importError: String?
@@ -60,7 +61,8 @@ struct VehicleDetailView: View {
                 MaintenanceHistorySection(
                     vehicle: vehicle,
                     onLog: { isLoggingService = true },
-                    onEdit: { editingServiceEntry = $0 }
+                    onEdit: { editingServiceEntry = $0 },
+                    onSchedule: { isShowingSchedule = true }
                 )
             case .stats:
                 FuelStatsSection(vehicle: vehicle)
@@ -71,6 +73,9 @@ struct VehicleDetailView: View {
         .scrollContentBackground(.hidden)
         .background(Theme.ground)
         .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(isPresented: $isShowingSchedule) {
+            FactoryScheduleView(vehicle: vehicle)
+        }
         .fileImporter(
             isPresented: $isImporting,
             allowedContentTypes: [.commaSeparatedText, .plainText]
