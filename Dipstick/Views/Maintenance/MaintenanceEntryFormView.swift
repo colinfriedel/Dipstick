@@ -33,12 +33,17 @@ struct MaintenanceEntryFormView: View {
     @State private var isPickingDate = false
 
     @FocusState private var odometerFocused: Bool
+    @FocusState private var serviceNameFocused: Bool
     @FocusState private var costFocused: Bool
     @FocusState private var milesFocused: Bool
     @FocusState private var monthsFocused: Bool
     @FocusState private var focusedPart: PartField?
 
     private static let customChoice = "Custom…"
+
+    /// Opened from plain LOG SERVICE (no service picked for you): you type
+    /// the service, and the chips under the field fill it in.
+    private let startsTyped: Bool
 
     struct PartDraft: Identifiable {
         let id = UUID()
@@ -64,7 +69,8 @@ struct MaintenanceEntryFormView: View {
         self.vehicle = vehicle
         self.entry = entry
 
-        _serviceChoice = State(initialValue: entry?.serviceType ?? serviceType ?? ServiceType.builtIn[0])
+        startsTyped = entry == nil && serviceType == nil
+        _serviceChoice = State(initialValue: entry?.serviceType ?? serviceType ?? Self.customChoice)
         _customService = State(initialValue: "")
         _date = State(initialValue: entry?.date ?? Date())
         _odometer = State(initialValue: entry.map { String($0.odometer) } ?? "")
@@ -176,7 +182,7 @@ struct MaintenanceEntryFormView: View {
     }
 
     private var isKeyboardUp: Bool {
-        odometerFocused || costFocused || milesFocused || monthsFocused || focusedPart != nil
+        odometerFocused || serviceNameFocused || costFocused || milesFocused || monthsFocused || focusedPart != nil
     }
 
     // MARK: Body
@@ -188,16 +194,12 @@ struct MaintenanceEntryFormView: View {
                     .padding(.bottom, 6)
 
                 SmallCapsLabel("Service")
-                serviceChips
-                if serviceChoice == Self.customChoice {
-                    TextField("Service name", text: $customService,
-                              prompt: Text("Service name").foregroundStyle(Theme.faint))
-                        .font(.dipstick(16, relativeTo: .body))
-                        .foregroundStyle(Theme.text)
-                        .textInputAutocapitalization(.sentences)
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 52)
-                        .panel(radius: Theme.Radius.field)
+                if startsTyped {
+                    serviceNameField
+                    suggestionChips
+                } else {
+                    serviceChips
+                    if serviceChoice == Self.customChoice { serviceNameField }
                 }
 
                 OdometerField(text: $odometer, focus: $odometerFocused, size: 24)
@@ -255,10 +257,60 @@ struct MaintenanceEntryFormView: View {
         .tint(Theme.accent)
         .onAppear { if !isEditing { prefillInterval() } }
         .onChange(of: serviceChoice) { if !isEditing { prefillInterval() } }
+        .onChange(of: customService) { if !isEditing { prefillInterval() } }
         .onChange(of: parts.first?.quantity) { if manualCost != nil { deriveSinglePartPrice() } }
         .task {
-            if !isEditing { await focusAfterPresentation { odometerFocused = true } }
+            if !isEditing {
+                await focusAfterPresentation {
+                    if startsTyped { serviceNameFocused = true } else { odometerFocused = true }
+                }
+            }
         }
+    }
+
+    private var serviceNameField: some View {
+        TextField("Service name", text: $customService,
+                  prompt: Text(startsTyped ? "What did you do?" : "Service name").foregroundStyle(Theme.faint))
+            .font(.dipstick(16, relativeTo: .body))
+            .foregroundStyle(Theme.text)
+            .textInputAutocapitalization(.sentences)
+            .submitLabel(.next)
+            .onSubmit { odometerFocused = true }
+            .focused($serviceNameFocused)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 52)
+            .panel(radius: Theme.Radius.field,
+                   border: serviceNameFocused ? Theme.accent : Theme.panelBorder,
+                   lineWidth: serviceNameFocused ? 1.5 : 1)
+    }
+
+    /// Services that fill in the name field: the car's scheduled ones first
+    /// (like the Maintenance tab's chips), then its others, then the rest.
+    /// Narrowed to matches once you start typing.
+    private var suggestions: [String] {
+        let all = FactorySchedule.scheduleFirst(
+            serviceOptions.filter { $0 != Self.customChoice },
+            schedule: vehicle.sortedScheduleItems.map(\.serviceType)
+        )
+        let typed = customService.trimmingCharacters(in: .whitespacesAndNewlines)
+        return typed.isEmpty ? all : all.filter { $0.localizedStandardContains(typed) }
+    }
+
+    private var suggestionChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(suggestions, id: \.self) { option in
+                    ChipButton(title: option,
+                               isSelected: option.caseInsensitiveCompare(resolvedServiceType) == .orderedSame) {
+                        customService = option
+                        serviceNameFocused = false
+                        odometerFocused = true
+                    }
+                }
+            }
+            .padding(.vertical, 1)
+        }
+        .scrollClipDisabled()
     }
 
     private var serviceChips: some View {
@@ -383,6 +435,7 @@ struct MaintenanceEntryFormView: View {
 
     private func hideKeyboard() {
         odometerFocused = false
+        serviceNameFocused = false
         costFocused = false
         milesFocused = false
         monthsFocused = false
