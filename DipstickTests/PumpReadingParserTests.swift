@@ -111,7 +111,43 @@ struct PumpReadingParserTests {
 
         #expect(voter.add(good) == nil)
         #expect(voter.add(misread) == nil)
-        #expect(voter.add(good) == nil)
-        #expect(isTenTenFill(voter.add(good)))  // third agreeing frame
+        #expect(isTenTenFill(voter.add(good)))  // second agreeing frame
+    }
+
+    // MARK: Decimal point not read
+
+    /// The Chevron photo in private/pump-photos: "Sale $ 73.87" read as "7387".
+    @Test func totalWithItsPointMissed() {
+        let reading = Parser.parse(["Cash Customers Please Pay First", "DCL 030-1", "Sale $", "Gallons", "7387", "10.555"])
+        #expect(reading?.gallons == 10.555)
+        #expect(reading?.total == 73.87)
+        #expect(reading?.pricePerGallon == 6.999)
+    }
+
+    @Test func gallonsWithItsPointMissed() {
+        let reading = Parser.parse(["60.06", "9768"])
+        #expect(reading?.gallons == 9.768)
+        #expect(reading?.total == 60.06)
+    }
+
+    @Test func bothPointsMissedNeedsARecentPrice() {
+        #expect(Parser.parse(["6006", "9768"]) == nil)
+        #expect(isTenTenFill(Parser.parse(["6006", "9768"], expectedPrice: 6.10)))
+        #expect(Parser.parse(["6006", "9768"], expectedPrice: 4.00) == nil)
+    }
+
+    @Test func photoReaderPrefersCheckedThenAgreement() {
+        let likely = Parser.parse(["60.06", "9.768"])!
+        let other = Parser.parse(["60.06", "9.786"])!
+        let checked = Parser.parse(["60.06", "9.768", "6.149"])!
+        #expect(PumpPhotoReader.best(of: [other, likely, likely]) == likely)
+        #expect(PumpPhotoReader.best(of: [likely, likely, checked]) == checked)
+        #expect(PumpPhotoReader.best(of: []) == nil)
+    }
+
+    @Test func readPointBeatsAGuessedOne() {
+        // "2026" could be $20.26, but the total that kept its point wins.
+        let reading = Parser.parse(["OCT 18 2026", "60.06", "9.768"])
+        #expect(isTenTenFill(reading))
     }
 }

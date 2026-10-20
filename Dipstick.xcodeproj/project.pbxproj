@@ -375,7 +375,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Dipstick-Info.plist";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Dipstick reads the gallons and total from the pump display so you don't have to type them. No photo is taken or saved.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Dipstick reads the gallons and total from the pump display so you don't have to type them. Photos are read on the phone and never saved or sent.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Dipstick can record a drive automatically when your phone connects to your car, even if the app isn't open. Only city and highway mile totals are saved, never your route.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Dipstick uses your location while recording a drive to measure how many miles were city and how many were highway. Only the totals are saved, never your route.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -411,7 +411,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Dipstick-Info.plist";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Dipstick reads the gallons and total from the pump display so you don't have to type them. No photo is taken or saved.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Dipstick reads the gallons and total from the pump display so you don't have to type them. Photos are read on the phone and never saved or sent.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Dipstick can record a drive automatically when your phone connects to your car, even if the app isn't open. Only city and highway mile totals are saved, never your route.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Dipstick uses your location while recording a drive to measure how many miles were city and how many were highway. Only the totals are saved, never your route.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

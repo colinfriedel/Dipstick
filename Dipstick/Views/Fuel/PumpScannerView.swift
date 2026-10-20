@@ -8,9 +8,13 @@ import VisionKit
 import AVFoundation
 
 /// Full-screen pump scanner (design board G). Reads the pump's display from
-/// the live camera feed; no photo is taken or stored. Once a reading checks
-/// out on several frames it's handed back. Always dark, since it sits over the
-/// camera.
+/// the live camera feed; once a reading checks out on a few frames it's
+/// handed back. If live reading doesn't lock on (glare, odd angle), the
+/// capture button reads one still photo harder (see `PumpPhotoReader`); the
+/// photo is never saved. Always dark, since it sits over the camera.
+///
+/// Debug builds also show the raw text being read, and can share a capture
+/// that failed, for tuning with tools/scan_pump_photo.swift.
 struct PumpScannerView: View {
     let vehicle: Vehicle
     /// The car's recent price per gallon, to reject implausible readings.
@@ -21,6 +25,12 @@ struct PumpScannerView: View {
 
     @State private var boxes: [ScanBox] = []
     @State private var isTorchOn = false
+    @State private var handle = ScannerHandle()
+    @State private var liveText: [String] = []
+    @State private var isReadingPhoto = false
+    @State private var captureFailed = false
+    /// Debug builds: the failed capture, to share for tuning.
+    @State private var failedPhotoURL: URL?
 
     private var isSupported: Bool {
         DataScannerViewController.isSupported && DataScannerViewController.isAvailable
@@ -31,7 +41,8 @@ struct PumpScannerView: View {
             Color.black.ignoresSafeArea()
 
             if isSupported {
-                LiveTextScanner(expectedPrice: expectedPrice, onConfirmed: onReading) { boxes = $0 }
+                LiveTextScanner(expectedPrice: expectedPrice, handle: handle, onConfirmed: onReading,
+                                onText: { liveText = $0 }) { boxes = $0 }
                     .ignoresSafeArea()
                     .overlay {
                         ForEach(boxes) { box in
@@ -43,15 +54,30 @@ struct PumpScannerView: View {
 
             VStack(spacing: 0) {
                 topBar
+                #if DEBUG
+                debugStrip
+                #endif
                 Spacer()
                 if isSupported {
                     ScanFrame()
                         .frame(width: 260, height: 240)
                         .allowsHitTesting(false)
-                    Text("Point at the pump display")
+                    Text(statusText)
                         .font(.dipstick(16, .semibold, relativeTo: .headline))
                         .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
                         .padding(.top, 28)
+                    #if DEBUG
+                    if captureFailed, let failedPhotoURL {
+                        ShareLink(item: failedPhotoURL) {
+                            Label("Share photo for tuning", systemImage: "square.and.arrow.up")
+                                .font(.dipstick(13, .semibold, relativeTo: .footnote))
+                        }
+                        .foregroundStyle(Theme.accent)
+                        .padding(.top, 10)
+                    }
+                    #endif
                 } else {
                     Text("Scanning isn't available on this device, or camera access is off in Settings › Dipstick.")
                         .font(.dipstick(15, relativeTo: .body))
@@ -60,6 +86,9 @@ struct PumpScannerView: View {
                         .padding(.horizontal, 32)
                 }
                 Spacer()
+                if isSupported {
+                    captureButton.padding(.bottom, 16)
+                }
                 Button(action: onEnterManually) {
                     Text("Enter manually")
                 }
@@ -71,6 +100,83 @@ struct PumpScannerView: View {
         .environment(\.colorScheme, .dark)
         .onDisappear { setTorch(false) }
     }
+
+    private var statusText: String {
+        if isReadingPhoto { return "Reading photo…" }
+        if captureFailed { return "Couldn't read that one. Try another angle, or shade the screen from the sun." }
+        return "Point at the pump display"
+    }
+
+    /// Takes one still photo and reads it harder than the live feed.
+    private var captureButton: some View {
+        Button(action: capture) {
+            ZStack {
+                Circle().strokeBorder(.white, lineWidth: 3).frame(width: 68, height: 68)
+                if isReadingPhoto {
+                    ProgressView().tint(.white)
+                } else {
+                    Circle().fill(.white).frame(width: 54, height: 54)
+                }
+            }
+            .frame(width: 72, height: 72)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isReadingPhoto)
+        .accessibilityLabel("Capture photo of the display")
+    }
+
+    private func capture() {
+        guard let scanner = handle.scanner else { return }
+        isReadingPhoto = true
+        captureFailed = false
+        let expectedPrice = expectedPrice
+        Task {
+            defer { isReadingPhoto = false }
+            guard let photo = try? await scanner.capturePhoto(), let cgImage = photo.cgImage else {
+                captureFailed = true
+                return
+            }
+            let orientation = CGImagePropertyOrientation(photo.imageOrientation)
+            let result = await Task.detached(priority: .userInitiated) {
+                PumpPhotoReader.read(cgImage, orientation: orientation, expectedPrice: expectedPrice)
+            }.value
+            if let reading = result.reading {
+                handle.finish()
+                onReading(reading)
+            } else {
+                captureFailed = true
+                #if DEBUG
+                failedPhotoURL = Self.writeForSharing(photo)
+                #endif
+            }
+        }
+    }
+
+    #if DEBUG
+    /// Raw text the live scanner reads, newest frame, numbers only.
+    private var debugStrip: some View {
+        let numeric = liveText.filter { $0.contains(where: \.isNumber) }
+        return Text(numeric.isEmpty ? "DEBUG · no numbers read" : "DEBUG · " + numeric.joined(separator: " | "))
+            .font(.readout(12, relativeTo: .caption))
+            .foregroundStyle(.white)
+            .lineLimit(3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
+            .background(RoundedRectangle(cornerRadius: 8).fill(.black.opacity(0.6)))
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .allowsHitTesting(false)
+    }
+
+    private static func writeForSharing(_ photo: UIImage) -> URL? {
+        guard let data = photo.jpegData(compressionQuality: 0.9) else { return nil }
+        let stamp = Date().formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false))
+            .replacingOccurrences(of: ":", with: "")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("pump-\(stamp).jpg")
+        return (try? data.write(to: url)) != nil ? url : nil
+    }
+    #endif
 
     private var topBar: some View {
         HStack {
@@ -171,7 +277,9 @@ private struct ScanBoxView: View {
 /// used are reported as boxes in the scanner view's coordinates.
 private struct LiveTextScanner: UIViewControllerRepresentable {
     let expectedPrice: Double?
+    let handle: ScannerHandle
     let onConfirmed: (PumpReadingParser.Reading) -> Void
+    let onText: ([String]) -> Void
     let onBoxes: ([ScanBox]) -> Void
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
@@ -184,6 +292,8 @@ private struct LiveTextScanner: UIViewControllerRepresentable {
         )
         scanner.delegate = context.coordinator
         try? scanner.startScanning()
+        handle.scanner = scanner
+        handle.coordinator = context.coordinator
         return scanner
     }
 
@@ -194,21 +304,25 @@ private struct LiveTextScanner: UIViewControllerRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(expectedPrice: expectedPrice, onConfirmed: onConfirmed, onBoxes: onBoxes)
+        Coordinator(expectedPrice: expectedPrice, onConfirmed: onConfirmed, onText: onText, onBoxes: onBoxes)
     }
 
     final class Coordinator: NSObject, DataScannerViewControllerDelegate {
         private let expectedPrice: Double?
         private let onConfirmed: (PumpReadingParser.Reading) -> Void
+        private let onText: ([String]) -> Void
         private let onBoxes: ([ScanBox]) -> Void
         private var voter = PumpReadingVoter()
-        private var done = false
+        /// Set once a reading has been handed back (live or from a capture).
+        var done = false
 
         init(expectedPrice: Double?,
              onConfirmed: @escaping (PumpReadingParser.Reading) -> Void,
+             onText: @escaping ([String]) -> Void,
              onBoxes: @escaping ([ScanBox]) -> Void) {
             self.expectedPrice = expectedPrice
             self.onConfirmed = onConfirmed
+            self.onText = onText
             self.onBoxes = onBoxes
         }
 
@@ -234,6 +348,7 @@ private struct LiveTextScanner: UIViewControllerRepresentable {
                 let rect = CGRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!)
                 return (text.transcript, rect)
             }
+            onText(texts.map(\.transcript))
             let reading = PumpReadingParser.parse(texts.map(\.transcript), expectedPrice: expectedPrice)
             onBoxes(reading.map { Self.boxes(for: $0, in: texts) } ?? [])
             if let confirmed = voter.add(reading) {
@@ -260,6 +375,32 @@ private struct LiveTextScanner: UIViewControllerRepresentable {
                 find("PRICE / GAL", reading.pricePerGallon, decimals: 3)
             }
             return result
+        }
+    }
+}
+
+/// Lets the SwiftUI view reach the live scanner to capture a still photo, and
+/// stop live reading once a capture has filled the form.
+@MainActor
+final class ScannerHandle {
+    weak var scanner: DataScannerViewController?
+    fileprivate weak var coordinator: LiveTextScanner.Coordinator?
+
+    func finish() { coordinator?.done = true }
+}
+
+private extension CGImagePropertyOrientation {
+    init(_ orientation: UIImage.Orientation) {
+        switch orientation {
+        case .up: self = .up
+        case .upMirrored: self = .upMirrored
+        case .down: self = .down
+        case .downMirrored: self = .downMirrored
+        case .left: self = .left
+        case .leftMirrored: self = .leftMirrored
+        case .right: self = .right
+        case .rightMirrored: self = .rightMirrored
+        @unknown default: self = .up
         }
     }
 }

@@ -14,8 +14,13 @@ import Foundation
 /// (3 decimals or "6.14 9/10") is also visible, gallons × price must match the
 /// total to the cent, which makes the reading "checked".
 ///
+/// Segment displays' decimal points are tiny and often not read ("7387" for
+/// $73.87), so a 3–5 digit number without one is also tried as a total (2
+/// decimals) or gallons (3 decimals), but only alongside a number that kept
+/// its point, unless the car's recent price is known to check against.
+///
 /// Foundation only, so tools/scan_pump_photo.swift can reuse it on a Mac.
-enum PumpReadingParser {
+nonisolated enum PumpReadingParser {
     struct Reading: Equatable {
         enum Confidence: Int, Comparable {
             /// Gallons and total only; price worked out from them.
@@ -36,6 +41,8 @@ enum PumpReadingParser {
         let decimals: Int
         /// Lowercased text of the line it came from, for label hints.
         let line: String
+        /// The decimal point wasn't read; `decimals` is a guess.
+        var missingPoint = false
     }
 
     // Plausible ranges for one fill-up.
@@ -92,6 +99,16 @@ enum PumpReadingParser {
                 }
             }
         }
+
+        // "7387" with the point missed: try it as $73.87 and as 7.387 gal.
+        let undotted = #"(?<![\d.,])(\d{3,5})(?![\d.,])"#
+        if let regex = try? NSRegularExpression(pattern: undotted) {
+            for match in regex.matches(in: line, range: NSRange(line.startIndex..., in: line)) {
+                guard let digits = Double(substring(line, match.range(at: 1))) else { continue }
+                found.append(Number(value: digits / 100, decimals: 2, line: lower, missingPoint: true))
+                found.append(Number(value: digits / 1000, decimals: 3, line: lower, missingPoint: true))
+            }
+        }
         return found
     }
 
@@ -139,6 +156,9 @@ enum PumpReadingParser {
 
         for g in unique where gallonsRange.contains(g.value) {
             for t in unique where t != g && totalRange.contains(t.value) {
+                // Both points missing is too easy to match by chance without
+                // a recent price to check against.
+                if g.missingPoint && t.missingPoint && expectedPrice == nil { continue }
                 // With a displayed price: the strong, self-checking case.
                 for p in unique where p != g && p != t && isPlausible(price: p.value, expected: expectedPrice) {
                     if abs(g.value * p.value - t.value) <= tolerance {
@@ -167,12 +187,16 @@ enum PumpReadingParser {
         if gallons.line.contains("gal") && !gallons.line.contains("/gal") { score += 2 }
         if ["sale", "total", "amount", "$"].contains(where: total.line.contains) { score += 2 }
         if let price, ["price", "/gal", "per", "unit"].contains(where: price.line.contains) { score += 1 }
+        // A number whose point was read beats a guessed one.
+        score -= 3 * [gallons.missingPoint, total.missingPoint, price?.missingPoint ?? false].filter { $0 }.count
         return score
     }
 
     private static func deduplicated(_ numbers: [Number]) -> [Number] {
         var seen = Set<String>()
-        return numbers.filter { seen.insert("\($0.value)|\($0.decimals)").inserted }
+        // Keep a number whose point was read over the same value guessed.
+        let ordered = numbers.filter { !$0.missingPoint } + numbers.filter(\.missingPoint)
+        return ordered.filter { seen.insert("\($0.value)|\($0.decimals)").inserted }
     }
 
     private static func substring(_ string: String, _ range: NSRange) -> String {
@@ -182,9 +206,9 @@ enum PumpReadingParser {
 
 /// Collects readings from successive camera frames and accepts one only once
 /// it has been seen enough times, so a single misread frame can't fill the form.
-struct PumpReadingVoter {
-    static let checkedFramesNeeded = 3
-    static let priceInferredFramesNeeded = 6
+nonisolated struct PumpReadingVoter {
+    static let checkedFramesNeeded = 2
+    static let priceInferredFramesNeeded = 4
 
     private var counts: [String: (reading: PumpReadingParser.Reading, frames: Int)] = [:]
 
