@@ -3,6 +3,7 @@
 //  DipstickTests
 //
 
+import CoreGraphics
 import Testing
 @testable import Dipstick
 
@@ -57,7 +58,7 @@ struct PumpReadingParserTests {
         #expect(reading?.gallons == 9.768)
         #expect(reading?.total == 60.06)
         #expect(reading?.pricePerGallon == 6.149)
-        #expect(reading?.confidence == .priceInferred)
+        #expect(reading?.confidence == .priceFits)
     }
 
     @Test func mainScreenWithGallonsAndTotalOnly() {
@@ -69,7 +70,7 @@ struct PumpReadingParserTests {
         ] {
             let reading = Parser.parse(lines, expectedPrice: 6.21)
             #expect(isTenTenFill(reading), "\(lines)")
-            #expect(reading?.confidence == .priceInferred)
+            #expect(reading?.confidence == .priceFits)
         }
     }
 
@@ -82,13 +83,27 @@ struct PumpReadingParserTests {
         #expect(Parser.parse(["16.06", "9.768"]) != nil)
     }
 
-    @Test func voterNeedsSixFramesWithoutAPrice() {
+    @Test func voterNeedsMoreFramesWithoutAPrice() {
         var voter = PumpReadingVoter()
         let reading = Parser.parse(["60.06", "9.768"])
-        for _ in 1..<PumpReadingVoter.priceInferredFramesNeeded {
+        #expect(reading?.confidence == .priceFits)
+        for _ in 1..<PumpReadingVoter.fitsFramesNeeded {
             #expect(voter.add(reading) == nil)
         }
         #expect(isTenTenFill(voter.add(reading)))
+    }
+
+    @Test func voterNeverAcceptsAMerelyPlausiblePrice() {
+        var voter = PumpReadingVoter()
+        let reading = Parser.parse(["73.01", "10.555"])
+        #expect(reading?.confidence == .priceInferred)
+        for _ in 0..<10 { #expect(voter.add(reading) == nil) }
+    }
+
+    @Test func smallFillsAreRead() {
+        // 1.311 gal at $5.179 (pump9), and a top-off under a gallon.
+        #expect(Parser.parse(["6.79", "1.311"])?.gallons == 1.311)
+        #expect(Parser.parse(["3.41", "0.658"])?.gallons == 0.658)
     }
 
     @Test func checkedReadingBeatsALikelyOne() {
@@ -143,6 +158,57 @@ struct PumpReadingParserTests {
         #expect(PumpPhotoReader.best(of: [other, likely, likely]) == likely)
         #expect(PumpPhotoReader.best(of: [likely, likely, checked]) == checked)
         #expect(PumpPhotoReader.best(of: []) == nil)
+    }
+
+    @Test func scanFrameMapsOntoTheAspectFilledPhoto() {
+        // A 4:3 portrait photo (3000×4000) filling a 400×800 screen: scaled
+        // to 600×800, so 100 pt is cut off each side.
+        let crop = PumpPhotoReader.crop(for: CGRect(x: 100, y: 300, width: 200, height: 200),
+                                        in: CGSize(width: 400, height: 800),
+                                        photoSize: CGSize(width: 3000, height: 4000), margin: 0)
+        #expect(abs(crop.minX - 200.0 / 600) < 0.0001)
+        #expect(abs(crop.width - 200.0 / 600) < 0.0001)
+        #expect(abs(crop.minY - 300.0 / 800) < 0.0001)
+        #expect(abs(crop.height - 200.0 / 800) < 0.0001)
+        // The margin grows it, but never past the photo's edges.
+        let grown = PumpPhotoReader.crop(for: CGRect(x: 0, y: 0, width: 400, height: 800),
+                                         in: CGSize(width: 400, height: 800),
+                                         photoSize: CGSize(width: 3000, height: 4000))
+        #expect(grown.minY == 0 && grown.maxY == 1)
+    }
+
+    @Test func nineTenthsPriceSettlesAMisreadLastDigit() {
+        #expect(Parser.nineTenthsPrice(gallons: 10.555, total: 73.87) == 6.999)
+        #expect(Parser.nineTenthsPrice(gallons: 10.555, total: 73.81) == nil)
+        #expect(Parser.nineTenthsPrice(gallons: 9.768, total: 60.06) == 6.149)
+        // Both "73.81" and "73.87" read in the same frame: the one an x.xx9
+        // price explains wins.
+        let reading = Parser.parse(["73.81", "73.87", "10.555"])
+        #expect(reading?.total == 73.87)
+        #expect(reading?.confidence == .priceFits)
+        // And across versions of a photo, even when outvoted.
+        let fits = Parser.parse(["73.87", "10.555"])!
+        let otherwise = Parser.parse(["73.01", "10.555"])!
+        #expect(otherwise.confidence == .priceInferred)
+        #expect(PumpPhotoReader.best(of: [otherwise, otherwise, fits]) == fits)
+    }
+
+    @Test func misreadSegmentDigitIsCorrected() {
+        // Every read of the Chevron photo's "$73.87" saw the last 7 as a 1.
+        let reading = Parser.parse(["Sale $", "73.81", "Gallons", "10.555"])
+        #expect(reading?.total == 73.87)
+        #expect(reading?.pricePerGallon == 6.999)
+        #expect(reading?.confidence == .priceFitsCorrected)
+        // A leading 7 read as 1 ($13.87 would be $1.31/gal).
+        #expect(Parser.parse(["13.87", "10.555"])?.total == 73.87)
+        // A total that already fits is left alone.
+        #expect(Parser.parse(["73.87", "10.555"])?.confidence == .priceFits)
+    }
+
+    @Test func correctionOnlyWhenExactlyOneFixFits() {
+        #expect(Parser.correctedTotal(gallons: 10.555, total: 73.81, expectedPrice: nil)?.total == 73.87)
+        // Nothing to fix toward: no single-digit change fits.
+        #expect(Parser.correctedTotal(gallons: 10.555, total: 73.01, expectedPrice: nil) == nil)
     }
 
     @Test func readPointBeatsAGuessedOne() {

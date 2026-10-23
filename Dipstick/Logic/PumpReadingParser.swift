@@ -10,7 +10,12 @@ import Foundation
 ///
 /// The usual case is the pump's main screen, which shows only gallons (3
 /// decimals, 9.768) and the total (2 decimals, 60.06); the price is worked out
-/// as total ÷ gallons and must be close to the car's recent price. If a price
+/// as total ÷ gallons and must be close to the car's recent price. Pump
+/// prices almost always end in 9/10 of a cent, so a pair whose total some
+/// x.xx9 price explains ($6.999 × 10.555 = $73.874 → $73.87) beats one no
+/// such price explains. And when a total doesn't fit, one digit is tried as
+/// its usual segment misread (a "7" missing its top bar reads as "1"): if
+/// exactly one such fix fits an x.xx9 price, it's used ($73.81 → $73.87). If a price
 /// (3 decimals or "6.14 9/10") is also visible, gallons × price must match the
 /// total to the cent, which makes the reading "checked".
 ///
@@ -25,6 +30,10 @@ nonisolated enum PumpReadingParser {
         enum Confidence: Int, Comparable {
             /// Gallons and total only; price worked out from them.
             case priceInferred
+            /// As `priceFits`, after fixing one misread digit of the total.
+            case priceFitsCorrected
+            /// Gallons and total only, and an x.xx9 price explains the total.
+            case priceFits
             /// A displayed price agrees: gallons × price = total.
             case checked
             static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
@@ -46,7 +55,8 @@ nonisolated enum PumpReadingParser {
     }
 
     // Plausible ranges for one fill-up.
-    static let gallonsRange = 0.5...40.0
+    /// Any amount the display can show; the price check does the filtering.
+    static let gallonsRange = 0.001...40.0
     static let priceRange = 1.5...12.0
     static let totalRange = 1.0...400.0
     /// Pumps round the total to the cent; allow a little slack for that.
@@ -167,15 +177,63 @@ nonisolated enum PumpReadingParser {
                     }
                 }
                 // The main screen's usual case: gallons and total only.
+                guard g.decimals == 3, t.decimals == 2 else { continue }
                 let implied = t.value / g.value
-                if g.decimals == 3, t.decimals == 2, isPlausible(price: implied, expected: expectedPrice) {
+                let plausible = isPlausible(price: implied, expected: expectedPrice)
+                let ninePrice = plausible ? nineTenthsPrice(gallons: g.value, total: t.value) : nil
+                if plausible {
                     let reading = Reading(gallons: g.value, total: t.value,
-                                          pricePerGallon: (implied * 1000).rounded() / 1000, confidence: .priceInferred)
+                                          pricePerGallon: ninePrice ?? (implied * 1000).rounded() / 1000,
+                                          confidence: ninePrice == nil ? .priceInferred : .priceFits)
+                    consider(reading, score: score(gallons: g, total: t, price: nil))
+                }
+                // No x.xx9 price explains it (or the price is way off, like
+                // $13.87 for $73.87): maybe a segment digit was misread.
+                if ninePrice == nil, let fixed = correctedTotal(gallons: g.value, total: t.value,
+                                                                expectedPrice: expectedPrice) {
+                    let reading = Reading(gallons: g.value, total: fixed.total, pricePerGallon: fixed.price,
+                                          confidence: .priceFitsCorrected)
                     consider(reading, score: score(gallons: g, total: t, price: nil))
                 }
             }
         }
         return best?.reading
+    }
+
+    /// An x.xx9 price that, times the gallons, rounds to the total; nil if
+    /// none does.
+    static func nineTenthsPrice(gallons: Double, total: Double) -> Double? {
+        guard gallons > 0 else { return nil }
+        let low = (total - 0.005) / gallons, high = (total + 0.005) / gallons
+        let cents = ((low - 0.009) * 100 - 1e-9).rounded(.up)
+        let price = ((cents / 100 + 0.009) * 1000).rounded() / 1000
+        return price >= low - 1e-9 && price <= high + 1e-9 ? price : nil
+    }
+
+    /// What each segment digit is most often misread as, the other way round:
+    /// a "1" may really be a "7" whose top bar wasn't seen, and so on.
+    static let segmentMisreads: [Character: [Character]] = [
+        "1": ["7"], "7": ["1"], "3": ["8"], "8": ["3", "0", "6", "9"],
+        "0": ["8"], "6": ["5", "8"], "5": ["6"], "9": ["8"],
+    ]
+
+    /// The total with one digit changed to a likely misread, if exactly one
+    /// such change makes an x.xx9 price explain it (with a plausible price).
+    static func correctedTotal(gallons: Double, total: Double,
+                               expectedPrice: Double?) -> (total: Double, price: Double)? {
+        let digits = Array(String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), total))
+        var fits: [(total: Double, price: Double)] = []
+        for (index, digit) in digits.enumerated() {
+            for swap in segmentMisreads[digit] ?? [] {
+                var changed = digits
+                changed[index] = swap
+                guard let value = Double(String(changed)), totalRange.contains(value),
+                      isPlausible(price: value / gallons, expected: expectedPrice),
+                      let price = nineTenthsPrice(gallons: gallons, total: value) else { continue }
+                fits.append((value, price))
+            }
+        }
+        return fits.count == 1 ? fits[0] : nil
     }
 
     /// Prefers numbers in their usual shape and next to their usual labels.
@@ -208,17 +266,21 @@ nonisolated enum PumpReadingParser {
 /// it has been seen enough times, so a single misread frame can't fill the form.
 nonisolated struct PumpReadingVoter {
     static let checkedFramesNeeded = 2
-    static let priceInferredFramesNeeded = 4
+    /// For a reading whose price works out to an x.xx9 pump price.
+    static let fitsFramesNeeded = 3
 
     private var counts: [String: (reading: PumpReadingParser.Reading, frames: Int)] = [:]
 
     /// Adds one frame's reading; returns a reading once it's confirmed.
     mutating func add(_ reading: PumpReadingParser.Reading?) -> PumpReadingParser.Reading? {
-        guard let reading else { return nil }
+        // A price that's merely plausible is too easy to get from stray
+        // numbers on screen (1.055 gal and a $7.42 elsewhere); live reading
+        // needs the stronger checks. The capture button still accepts it.
+        guard let reading, reading.confidence > .priceInferred else { return nil }
         let key = String(format: "%.3f|%.2f|%.3f", reading.gallons, reading.total, reading.pricePerGallon)
         let frames = (counts[key]?.frames ?? 0) + 1
         counts[key] = (reading, frames)
-        let needed = reading.confidence == .checked ? Self.checkedFramesNeeded : Self.priceInferredFramesNeeded
+        let needed = reading.confidence == .checked ? Self.checkedFramesNeeded : Self.fitsFramesNeeded
         return frames >= needed ? reading : nil
     }
 }

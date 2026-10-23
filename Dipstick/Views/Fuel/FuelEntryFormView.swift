@@ -8,13 +8,19 @@ import SwiftData
 
 /// Log or edit a fill-up (design boards H and I). For a new fill-up the
 /// odometer is never pre-filled: enter what the dash shows. After a scan,
-/// gallons and total arrive filled in and only the odometer is left.
+/// gallons and total arrive filled in and only the odometer is left. A scan
+/// that read the wrong numbers can be reported (and is, automatically, when a
+/// scanned number is corrected): saving the fill-up then saves the photo with
+/// the right numbers for tuning the reader (see `ScanReports`).
 /// Shown inside `FillUpFlowView`, which handles the scanner.
 struct FuelEntryFormView: View {
     let vehicle: Vehicle
     let entry: FuelEntry?
     /// Set when gallons and total came from the pump scanner.
     let scanned: PumpReadingParser.Reading?
+    /// The scan's photo: of the reading above, or of a capture that couldn't
+    /// be read.
+    let scanEvidence: ScanEvidence?
     /// Open the scanner (SCAN PUMP / Rescan). Nil hides scanning (editing).
     let onScan: (() -> Void)?
     let onClose: () -> Void
@@ -30,16 +36,21 @@ struct FuelEntryFormView: View {
     @State private var notes: String
     @State private var isPickingDate = false
     @State private var showsOptional: Bool
+    /// Save the scan's photo with the saved numbers, to improve scanning.
+    @State private var reportsScan = false
+    /// Turned off by hand: don't turn it back on when numbers change.
+    @State private var reportDeclined = false
 
     @FocusState private var odometerFocused: Bool
     @FocusState private var gallonsFocused: Bool
     @FocusState private var totalFocused: Bool
 
     init(vehicle: Vehicle, entry: FuelEntry? = nil, scanned: PumpReadingParser.Reading? = nil,
-         onScan: (() -> Void)? = nil, onClose: @escaping () -> Void) {
+         scanEvidence: ScanEvidence? = nil, onScan: (() -> Void)? = nil, onClose: @escaping () -> Void) {
         self.vehicle = vehicle
         self.entry = entry
         self.scanned = scanned
+        self.scanEvidence = scanEvidence
         self.onScan = onScan
         self.onClose = onClose
         _date = State(initialValue: entry?.date ?? Date())
@@ -120,6 +131,7 @@ struct FuelEntryFormView: View {
                             Label("Scan pump", systemImage: "viewfinder")
                         }
                         .buttonStyle(BigActionButtonStyle(height: 56))
+                        if scanEvidence != nil { unreadPhotoRow }
                     }
                 }
 
@@ -160,23 +172,70 @@ struct FuelEntryFormView: View {
         .task {
             if !isEditing { await focusAfterPresentation { odometerFocused = true } }
         }
+        .onChange(of: gallons) { reportIfCorrected() }
+        .onChange(of: totalCost) { reportIfCorrected() }
+    }
+
+    /// Correcting a scanned number means the scan misread it.
+    private func reportIfCorrected() {
+        guard let scanned, scanEvidence != nil, !reportDeclined else { return }
+        let gallonsChanged = parsedGallons.map { abs($0 - scanned.gallons) > 0.0005 } ?? true
+        let totalChanged = parsedTotalCost.map { abs($0 - scanned.total) > 0.005 } ?? true
+        if gallonsChanged || totalChanged { reportsScan = true }
     }
 
     private func scannedBanner(onRescan: @escaping () -> Void) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "checkmark.circle")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color.green)
-            Text("Scanned from pump")
-                .font(.dipstick(14, .semibold, relativeTo: .subheadline))
-                .foregroundStyle(Theme.text)
-            Spacer()
-            Button("Rescan", action: onRescan)
-                .buttonStyle(SmallControlButtonStyle())
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: reportsScan ? "exclamationmark.triangle" : "checkmark.circle")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(reportsScan ? Theme.amber : Color.green)
+                Text(reportsScan ? "Misread reported" : "Scanned from pump")
+                    .font(.dipstick(14, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(Theme.text)
+                Spacer()
+                Button("Rescan", action: onRescan)
+                    .buttonStyle(SmallControlButtonStyle())
+            }
+            .frame(minHeight: 56)
+            if scanEvidence != nil {
+                FormDivider().padding(.leading, -16)
+                HStack(spacing: 8) {
+                    Text(reportsScan
+                         ? "Fix the numbers below. Saving keeps the photo with them to improve scanning."
+                         : "Numbers wrong?")
+                        .font(.dipstick(12, relativeTo: .caption))
+                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 4)
+                    Button(reportsScan ? "Undo" : "Report misread") {
+                        reportsScan.toggle()
+                        reportDeclined = !reportsScan
+                    }
+                    .font(.dipstick(13, .semibold, relativeTo: .footnote))
+                    .foregroundStyle(Theme.accentText)
+                    .frame(minHeight: Theme.minimumHitTarget)
+                }
+            }
         }
         .padding(.horizontal, 12)
-        .frame(minHeight: 56)
         .panel(radius: Theme.Radius.button)
+    }
+
+    /// A capture that couldn't be read: offer to keep it for tuning.
+    private var unreadPhotoRow: some View {
+        Toggle(isOn: $reportsScan) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Save the unread photo")
+                    .font(.dipstick(14, .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(Theme.text)
+                Text("Kept with the numbers you save, to improve scanning")
+                    .font(.dipstick(12, relativeTo: .caption))
+                    .foregroundStyle(Theme.muted)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .panel(radius: Theme.Radius.field)
     }
 
     @ViewBuilder
@@ -282,6 +341,9 @@ struct FuelEntryFormView: View {
         }
         vehicle.recordOdometer(odometerValue)
         modelContext.saveNow()
+        if reportsScan, let scanEvidence {
+            ScanReports.save(scanEvidence, total: costValue, gallons: gallonsValue)
+        }
         onClose()
     }
 
@@ -302,6 +364,7 @@ struct FillUpFlowView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isScanning: Bool
     @State private var reading: PumpReadingParser.Reading?
+    @State private var evidence: ScanEvidence?
     /// Bumped to rebuild the form with a new scan.
     @State private var formID = UUID()
 
@@ -318,12 +381,20 @@ struct FillUpFlowView: View {
                 PumpScannerView(
                     vehicle: vehicle,
                     expectedPrice: FuelEntryFormView.recentPricePerGallon(for: vehicle),
-                    onReading: { scan in
+                    onReading: { scan, photo in
                         reading = scan
+                        evidence = photo
                         formID = UUID()
                         withAnimation { isScanning = false }
                     },
-                    onEnterManually: { withAnimation { isScanning = false } },
+                    onEnterManually: { unread in
+                        // Offer the unread photo, unless an earlier scan already filled the form.
+                        if reading == nil, let unread {
+                            evidence = unread
+                            formID = UUID()
+                        }
+                        withAnimation { isScanning = false }
+                    },
                     onClose: {
                         // From Home there's no form to go back to.
                         if startInScanner && reading == nil { dismiss() } else { withAnimation { isScanning = false } }
@@ -332,7 +403,7 @@ struct FillUpFlowView: View {
                 .transition(.opacity)
             } else {
                 FuelEntryFormView(
-                    vehicle: vehicle, entry: entry, scanned: reading,
+                    vehicle: vehicle, entry: entry, scanned: reading, scanEvidence: evidence,
                     onScan: entry == nil ? { withAnimation { isScanning = true } } : nil,
                     onClose: { dismiss() }
                 )

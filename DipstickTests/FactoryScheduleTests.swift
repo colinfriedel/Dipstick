@@ -8,6 +8,7 @@ import SwiftData
 import Testing
 @testable import Dipstick
 
+@MainActor
 struct FactoryScheduleTests {
     private let calendar: Calendar = {
         var c = Calendar(identifier: .gregorian)
