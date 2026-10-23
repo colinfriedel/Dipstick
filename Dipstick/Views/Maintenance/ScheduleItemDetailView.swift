@@ -29,6 +29,7 @@ struct ScheduleItemDetailView: View {
                     .padding(.bottom, 24)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .background(Theme.ground)
         .toolbar(.hidden, for: .navigationBar)
         .fullScreenCover(isPresented: $isEditing) {
@@ -96,6 +97,9 @@ struct ScheduleItemDetailView: View {
                     .buttonStyle(.plain)
                 }
             }
+
+            ReferenceSection(vehicle: vehicle, kind: ReferencePage.serviceKind, name: item.serviceType)
+                .padding(.top, 8)
         }
     }
 

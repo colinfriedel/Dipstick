@@ -6,7 +6,7 @@
 import Foundation
 
 /// The built-in service names offered in pickers. Add new ones here.
-enum ServiceType {
+nonisolated enum ServiceType {
     static let builtIn = [
         "Oil change",
         "Tire rotation",
@@ -26,6 +26,12 @@ enum ServiceType {
     /// Built-in names followed by any custom names already used, so a custom
     /// service only has to be typed once.
     static func options<S: Sequence>(addingUsed used: S) -> [String] where S.Element == String {
+        options(builtIn: builtIn, addingUsed: used)
+    }
+
+    /// `builtIn` followed by custom names from `used`, sorted, without
+    /// duplicates (ignoring case).
+    static func options<S: Sequence>(builtIn: [String], addingUsed used: S) -> [String] where S.Element == String {
         let builtInKeys = Set(builtIn.map { $0.lowercased() })
         var seen = Set<String>()
         let custom = used

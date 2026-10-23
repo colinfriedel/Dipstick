@@ -40,6 +40,11 @@ final class Vehicle {
     /// Factory maintenance schedule from the owner's manual.
     @Relationship(deleteRule: .cascade, inverse: \ScheduleItem.vehicle)
     var scheduleItems: [ScheduleItem]? = []
+    @Relationship(deleteRule: .cascade, inverse: \TestEntry.vehicle)
+    var testEntries: [TestEntry]? = []
+    /// Notes and photos per service and test type.
+    @Relationship(deleteRule: .cascade, inverse: \ReferencePage.vehicle)
+    var referencePages: [ReferencePage]? = []
 
     init(
         name: String,

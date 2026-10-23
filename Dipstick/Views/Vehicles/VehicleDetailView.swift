@@ -29,6 +29,23 @@ struct VehicleDetailView: View {
     @State private var isLoggingService = false
     @State private var editingServiceEntry: MaintenanceEntry?
     @State private var log: Log = .fuel
+    @State private var maintenanceMode: MaintenanceMode = .services
+    @State private var isLoggingTest = false
+    @State private var editingTest: TestEntry?
+    @State private var openTestType: String?
+    @State private var referenceType: ReferenceTarget?
+
+    struct ReferenceTarget: Identifiable {
+        let name: String
+        var id: String { name }
+    }
+
+    /// The Maintenance tab's two halves.
+    enum MaintenanceMode: String, CaseIterable, Identifiable {
+        case services = "Services"
+        case testing = "Testing"
+        var id: Self { self }
+    }
     @State private var isUpdatingOdometer = false
     @State private var isShowingSchedule = false
     @State private var isImporting = false
@@ -58,12 +75,25 @@ struct VehicleDetailView: View {
                     onEdit: { editingFuelEntry = $0 }
                 )
             case .maintenance:
-                MaintenanceHistorySection(
-                    vehicle: vehicle,
-                    onLog: { isLoggingService = true },
-                    onEdit: { editingServiceEntry = $0 },
-                    onSchedule: { isShowingSchedule = true }
-                )
+                TabSwitch(tabs: MaintenanceMode.allCases, selection: $maintenanceMode) { $0.rawValue }
+                    .plainRow(top: 8, bottom: 0)
+                switch maintenanceMode {
+                case .services:
+                    MaintenanceHistorySection(
+                        vehicle: vehicle,
+                        onLog: { isLoggingService = true },
+                        onEdit: { editingServiceEntry = $0 },
+                        onSchedule: { isShowingSchedule = true },
+                        onReference: { referenceType = ReferenceTarget(name: $0) }
+                    )
+                case .testing:
+                    TestingSection(
+                        vehicle: vehicle,
+                        onLog: { isLoggingTest = true },
+                        onEdit: { editingTest = $0 },
+                        onOpenType: { openTestType = $0 }
+                    )
+                }
             case .stats:
                 FuelStatsSection(vehicle: vehicle)
             }
@@ -75,6 +105,9 @@ struct VehicleDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $isShowingSchedule) {
             FactoryScheduleView(vehicle: vehicle)
+        }
+        .navigationDestination(item: $openTestType) { type in
+            TestTypeView(vehicle: vehicle, testType: type)
         }
         .fileImporter(
             isPresented: $isImporting,
@@ -116,6 +149,15 @@ struct VehicleDetailView: View {
         }
         .fullScreenCover(item: $editingServiceEntry) { entry in
             MaintenanceEntryFormView(vehicle: vehicle, entry: entry)
+        }
+        .sheet(item: $referenceType) { target in
+            ReferencePageView(vehicle: vehicle, kind: ReferencePage.serviceKind, name: target.name)
+        }
+        .fullScreenCover(isPresented: $isLoggingTest) {
+            TestEntryFormView(vehicle: vehicle)
+        }
+        .fullScreenCover(item: $editingTest) { entry in
+            TestEntryFormView(vehicle: vehicle, entry: entry)
         }
         .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in
             dismiss()

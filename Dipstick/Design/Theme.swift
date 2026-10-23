@@ -61,6 +61,16 @@ enum Theme {
     /// Text on accent-filled buttons, in both modes.
     static let onAccent = Color(hex: 0x07080A)
 
+    /// Chart series (one line per cylinder or wheel), in this fixed order;
+    /// validated for color-blind separation on the panel color in both modes
+    /// (dataviz reference palette). Charts using it always show a legend.
+    static let series: [Color] = [
+        Color(light: 0x2A78D6, dark: 0x3987E5), Color(light: 0xEB6834, dark: 0xD95926),
+        Color(light: 0x1BAF7A, dark: 0x199E70), Color(light: 0xEDA100, dark: 0xC98500),
+        Color(light: 0xE87BA4, dark: 0xD55181), Color(light: 0x008300, dark: 0x008300),
+        Color(light: 0x6250D6, dark: 0x9085E9), Color(light: 0xE34948, dark: 0xE66767),
+    ]
+
     // MARK: Shape
 
     enum Radius {

@@ -20,6 +20,10 @@ struct DipstickApp: App {
             PartUsed.self,
             Trip.self,
             ScheduleItem.self,
+            TestEntry.self,
+            TestReading.self,
+            ReferencePage.self,
+            ReferencePhoto.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

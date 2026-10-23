@@ -31,6 +31,7 @@ struct MaintenanceEntryFormView: View {
     @State private var lastPrefill = MaintenanceSchedule.Interval()
     @State private var notes: String
     @State private var isPickingDate = false
+    @State private var isShowingReference = false
 
     @FocusState private var odometerFocused: Bool
     @FocusState private var serviceNameFocused: Bool
@@ -201,6 +202,12 @@ struct MaintenanceEntryFormView: View {
                     serviceChips
                     if serviceChoice == Self.customChoice { serviceNameField }
                 }
+                if !resolvedServiceType.isEmpty {
+                    ReferenceLink(vehicle: vehicle, kind: ReferencePage.serviceKind, name: resolvedServiceType) {
+                        hideKeyboard()
+                        isShowingReference = true
+                    }
+                }
 
                 OdometerField(text: $odometer, focus: $odometerFocused, size: 24)
                     .padding(.top, 4)
@@ -255,6 +262,9 @@ struct MaintenanceEntryFormView: View {
             )
         }
         .tint(Theme.accent)
+        .sheet(isPresented: $isShowingReference) {
+            ReferencePageView(vehicle: vehicle, kind: ReferencePage.serviceKind, name: resolvedServiceType)
+        }
         .onAppear { if !isEditing { prefillInterval() } }
         .onChange(of: serviceChoice) { if !isEditing { prefillInterval() } }
         .onChange(of: customService) { if !isEditing { prefillInterval() } }
