@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 /// Log or edit a service (design board J). Works for DIY jobs (the total adds
 /// up the parts) and shop visits (type the bill's total). For a new service
@@ -32,6 +33,17 @@ struct MaintenanceEntryFormView: View {
     @State private var notes: String
     @State private var isPickingDate = false
     @State private var isShowingReference = false
+    @State private var isChoosingReceiptSource = false
+    @State private var isPickingReceipt = false
+    @State private var isPhotographingReceipt = false
+    @State private var pickedReceipt: PhotosPickerItem?
+    @State private var receipt: ReceiptImage?
+
+    /// A receipt photo or screenshot to review.
+    struct ReceiptImage: Identifiable {
+        let id = UUID()
+        let data: Data
+    }
 
     @FocusState private var odometerFocused: Bool
     @FocusState private var serviceNameFocused: Bool
@@ -233,10 +245,17 @@ struct MaintenanceEntryFormView: View {
                 }
                 .padding(.top, 6)
                 partsPanel
-                if manualCost != nil, partsTotal > 0, abs((parsedCost ?? 0) - partsTotal) > 0.005 {
-                    Button("Parts add up to \(Units.currency(partsTotal)). Use parts total") { manualCost = nil }
-                        .font(.dipstick(12, relativeTo: .caption))
-                        .foregroundStyle(Theme.muted)
+                if manualCost != nil, partsTotal > 0, let cost = parsedCost, abs(cost - partsTotal) > 0.005 {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(cost > partsTotal
+                             ? "Parts \(Units.currency(partsTotal)) + \(Units.currency(cost - partsTotal)) tax and fees"
+                             : "Parts add up to \(Units.currency(partsTotal))")
+                            .foregroundStyle(Theme.muted)
+                        Spacer(minLength: 4)
+                        Button("Use parts total") { manualCost = nil }
+                            .foregroundStyle(Theme.accentText)
+                    }
+                    .font(.dipstick(12, relativeTo: .caption))
                 }
 
                 SectionTitle("Next due") {
@@ -262,6 +281,38 @@ struct MaintenanceEntryFormView: View {
             )
         }
         .tint(Theme.accent)
+        .confirmationDialog("Add parts from a receipt", isPresented: $isChoosingReceiptSource) {
+            Button("Take Photo") { isPhotographingReceipt = true }
+            Button("Choose Photo or Screenshot") { isPickingReceipt = true }
+        }
+        .photosPicker(isPresented: $isPickingReceipt, selection: $pickedReceipt, matching: .images)
+        .onChange(of: pickedReceipt) {
+            guard let item = pickedReceipt else { return }
+            pickedReceipt = nil
+            Task {
+                guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+                // Let the picker finish closing first.
+                try? await Task.sleep(for: .milliseconds(400))
+                receipt = ReceiptImage(data: data)
+            }
+        }
+        .fullScreenCover(isPresented: $isPhotographingReceipt) {
+            CameraPicker { data in
+                isPhotographingReceipt = false
+                if let data {
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(400))
+                        receipt = ReceiptImage(data: data)
+                    }
+                }
+            }
+            .ignoresSafeArea()
+        }
+        .fullScreenCover(item: $receipt) { image in
+            ReceiptReviewView(imageData: image.data) { found, keepPhoto in
+                addFromReceipt(found, keepPhoto: keepPhoto)
+            }
+        }
         .sheet(isPresented: $isShowingReference) {
             ReferencePageView(vehicle: vehicle, kind: ReferencePage.serviceKind, name: resolvedServiceType)
         }
@@ -367,26 +418,93 @@ struct MaintenanceEntryFormView: View {
     private var partsPanel: some View {
         VStack(spacing: 0) {
             ForEach($parts) { $part in
-                PartRow(part: $part, focusedPart: $focusedPart) {
+                PartRow(part: $part, focusedPart: $focusedPart,
+                        onSplit: { split(part.id, into: $0) }) {
                     parts.removeAll { $0.id == part.id }
                 }
                 FormDivider()
             }
-            Button {
-                let draft = PartDraft()
-                parts.append(draft)
-                focusedPart = .name(draft.id)
-            } label: {
-                Label("Add part", systemImage: "plus")
-                    .font(.dipstick(14, .semibold, relativeTo: .body))
-                    .foregroundStyle(Theme.accentText)
-                    .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .contentShape(Rectangle())
+            HStack(spacing: 0) {
+                Button {
+                    let draft = PartDraft()
+                    parts.append(draft)
+                    focusedPart = .name(draft.id)
+                } label: {
+                    Label("Add part", systemImage: "plus")
+                        .font(.dipstick(14, .semibold, relativeTo: .body))
+                        .foregroundStyle(Theme.accentText)
+                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Rectangle().fill(Theme.divider).frame(width: 1, height: 28)
+                Button {
+                    hideKeyboard()
+                    isChoosingReceiptSource = true
+                } label: {
+                    Label("From receipt", systemImage: "doc.text.viewfinder")
+                        .font(.dipstick(14, .semibold, relativeTo: .body))
+                        .foregroundStyle(Theme.accentText)
+                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .panel(radius: Theme.Radius.field)
+    }
+
+    /// Adds a receipt's parts for this job (replacing an empty part row), and
+    /// keeps the receipt with the service's notes and photos if asked.
+    /// Splits a part into separate parts of one each, sharing its cost to the
+    /// cent (a "pack of 2" bought as one line, two different items on one
+    /// line…). Rename them after.
+    private func split(_ id: UUID, into count: Int) {
+        guard count >= 2, let index = parts.firstIndex(where: { $0.id == id }) else { return }
+        let part = parts[index]
+        let totalCents = Int(((Units.parseDecimal(part.cost) ?? 0) * Double(part.quantity) * 100).rounded())
+        let pieces = (0..<count).map { totalCents / count + ($0 < totalCents % count ? 1 : 0) }
+        let newParts = pieces.map { cents in
+            PartDraft(name: part.name, partNumber: part.partNumber, quantity: 1,
+                      cost: totalCents > 0 ? String(format: "%.2f", Double(cents) / 100) : "")
+        }
+        parts.replaceSubrange(index...index, with: newParts)
+    }
+
+    /// Parts keep the receipt's prices; their share of the tax goes on top
+    /// in the total cost ("Parts $2.97 + $0.29 tax and fees").
+    private func addFromReceipt(_ found: [ReceiptSplit.Part], keepPhoto: Data?) {
+        let costBefore = parsedCost ?? partsTotal
+        parts.removeAll { $0.name.trimmingCharacters(in: .whitespaces).isEmpty && $0.cost.isEmpty && $0.partNumber.isEmpty }
+        let tax = found.reduce(0) { $0 + $1.taxShare }
+        if tax > 0.004 {
+            manualCost = Self.money(costBefore + found.reduce(0) { $0 + $1.total })
+        }
+        parts += found.map { part in
+            PartDraft(name: part.name, partNumber: part.partNumber ?? "", quantity: part.quantity,
+                      cost: Self.price(part.priceEach))
+        }
+        if let keepPhoto, !resolvedServiceType.isEmpty {
+            let page = vehicle.referencePageCreating(kind: ReferencePage.serviceKind, name: resolvedServiceType,
+                                                     in: modelContext)
+            let photo = ReferencePhoto(data: keepPhoto,
+                                       caption: "Receipt, \(date.formatted(date: .abbreviated, time: .omitted))",
+                                       order: (page.photos ?? []).map(\.order).max().map { $0 + 1 } ?? 0)
+            modelContext.insert(photo)
+            photo.page = page
+        }
+    }
+
+    /// A price each, to the cent when it divides evenly, else to 4 places so
+    /// quantity × price still adds up to what was paid.
+    private static func price(_ value: Double) -> String {
+        let cents = (value * 100).rounded() / 100
+        if abs(cents - value) < 0.00005 { return String(format: "%.2f", value) }
+        var text = String(format: "%.4f", value)
+        while text.hasSuffix("0") { text.removeLast() }
+        return text
     }
 
     private var nextDuePanel: some View {
@@ -537,6 +655,8 @@ struct MaintenanceEntryFormView: View {
 private struct PartRow: View {
     @Binding var part: MaintenanceEntryFormView.PartDraft
     var focusedPart: FocusState<MaintenanceEntryFormView.PartField?>.Binding
+    /// Split into this many separate parts.
+    let onSplit: (Int) -> Void
     let onRemove: () -> Void
 
     var body: some View {
@@ -547,6 +667,20 @@ private struct PartRow: View {
                     .font(.dipstick(15, .semibold, relativeTo: .body))
                     .foregroundStyle(Theme.text)
                     .focused(focusedPart, equals: .name(part.id))
+                Menu {
+                    Section("Split into separate parts, sharing the cost") {
+                        ForEach(2...5, id: \.self) { count in
+                            Button("Split into \(count)") { onSplit(count) }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "square.split.2x1")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.muted)
+                        .frame(width: 36, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Split \(part.name.isEmpty ? "part" : part.name)")
                 Button(action: onRemove) {
                     Image(systemName: "xmark")
                         .font(.system(size: 13, weight: .semibold))
