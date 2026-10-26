@@ -32,7 +32,12 @@ struct MaintenanceEntryFormView: View {
     @State private var lastPrefill = MaintenanceSchedule.Interval()
     @State private var notes: String
     @State private var isPickingDate = false
-    @State private var isShowingReference = false
+    @State private var photos: [PhotoDraft]
+    @State private var isChoosingPhotoSource = false
+    @State private var isPickingPhotos = false
+    @State private var isTakingPhoto = false
+    @State private var pickedPhotos: [PhotosPickerItem] = []
+    @State private var viewingPhoto: PhotoDraft?
     @State private var isChoosingReceiptSource = false
     @State private var isPickingReceipt = false
     @State private var isPhotographingReceipt = false
@@ -51,6 +56,7 @@ struct MaintenanceEntryFormView: View {
     @FocusState private var milesFocused: Bool
     @FocusState private var monthsFocused: Bool
     @FocusState private var focusedPart: PartField?
+    @FocusState private var notesFocused: Bool
 
     private static let customChoice = "Custom…"
 
@@ -88,6 +94,9 @@ struct MaintenanceEntryFormView: View {
         _date = State(initialValue: entry?.date ?? Date())
         _odometer = State(initialValue: entry.map { String($0.odometer) } ?? "")
         _notes = State(initialValue: entry?.notes ?? "")
+        _photos = State(initialValue: (entry?.sortedPhotos ?? []).map {
+            PhotoDraft(data: $0.data, caption: $0.caption, existing: $0)
+        })
 
         let existingParts = entry?.sortedParts ?? []
         _parts = State(initialValue: existingParts.map {
@@ -195,7 +204,8 @@ struct MaintenanceEntryFormView: View {
     }
 
     private var isKeyboardUp: Bool {
-        odometerFocused || serviceNameFocused || costFocused || milesFocused || monthsFocused || focusedPart != nil
+        odometerFocused || serviceNameFocused || costFocused || milesFocused || monthsFocused
+            || focusedPart != nil || notesFocused
     }
 
     // MARK: Body
@@ -214,11 +224,15 @@ struct MaintenanceEntryFormView: View {
                     serviceChips
                     if serviceChoice == Self.customChoice { serviceNameField }
                 }
-                if !resolvedServiceType.isEmpty {
-                    ReferenceLink(vehicle: vehicle, kind: ReferencePage.serviceKind, name: resolvedServiceType) {
-                        hideKeyboard()
-                        isShowingReference = true
+                if !resolvedServiceType.isEmpty,
+                   vehicle.hasPastServiceNotes(ofType: resolvedServiceType, excluding: entry) {
+                    SectionTitle("From past services") {
+                        Text("Notes and photos")
+                            .font(.dipstick(11.5, relativeTo: .caption))
+                            .foregroundStyle(Theme.muted)
                     }
+                    .padding(.top, 6)
+                    PastServiceNotes(vehicle: vehicle, serviceType: resolvedServiceType, excluding: entry)
                 }
 
                 OdometerField(text: $odometer, focus: $odometerFocused, size: 24)
@@ -266,7 +280,7 @@ struct MaintenanceEntryFormView: View {
                 .padding(.top, 6)
                 nextDuePanel
 
-                notesField
+                notesSection
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -313,8 +327,27 @@ struct MaintenanceEntryFormView: View {
                 addFromReceipt(found, keepPhoto: keepPhoto)
             }
         }
-        .sheet(isPresented: $isShowingReference) {
-            ReferencePageView(vehicle: vehicle, kind: ReferencePage.serviceKind, name: resolvedServiceType)
+        .confirmationDialog("Add photos", isPresented: $isChoosingPhotoSource) {
+            Button("Take Photo") { isTakingPhoto = true }
+            Button("Choose Photos") { isPickingPhotos = true }
+        }
+        .photosPicker(isPresented: $isPickingPhotos, selection: $pickedPhotos, maxSelectionCount: 20,
+                      matching: .images, photoLibrary: .shared())
+        .onChange(of: pickedPhotos) { addPickedPhotos() }
+        .fullScreenCover(isPresented: $isTakingPhoto) {
+            CameraPicker { data in
+                isTakingPhoto = false
+                guard let data else { return }
+                Task {
+                    if let small = await Task.detached(operation: { PhotoStore.downsized(data) }).value {
+                        photos.append(PhotoDraft(data: small))
+                    }
+                }
+            }
+            .ignoresSafeArea()
+        }
+        .fullScreenCover(item: $viewingPhoto) { photo in
+            DraftPhotoViewer(drafts: $photos, start: photo.id)
         }
         .onAppear { if !isEditing { prefillInterval() } }
         .onChange(of: serviceChoice) { if !isEditing { prefillInterval() } }
@@ -456,8 +489,6 @@ struct MaintenanceEntryFormView: View {
         .panel(radius: Theme.Radius.field)
     }
 
-    /// Adds a receipt's parts for this job (replacing an empty part row), and
-    /// keeps the receipt with the service's notes and photos if asked.
     /// Splits a part into separate parts of one each, sharing its cost to the
     /// cent (a "pack of 2" bought as one line, two different items on one
     /// line…). Rename them after.
@@ -473,6 +504,8 @@ struct MaintenanceEntryFormView: View {
         parts.replaceSubrange(index...index, with: newParts)
     }
 
+    /// Adds a receipt's parts for this job (replacing an empty part row), and
+    /// keeps the receipt with the service's photos if asked.
     /// Parts keep the receipt's prices; their share of the tax goes on top
     /// in the total cost ("Parts $2.97 + $0.29 tax and fees").
     private func addFromReceipt(_ found: [ReceiptSplit.Part], keepPhoto: Data?) {
@@ -486,14 +519,9 @@ struct MaintenanceEntryFormView: View {
             PartDraft(name: part.name, partNumber: part.partNumber ?? "", quantity: part.quantity,
                       cost: Self.price(part.priceEach))
         }
-        if let keepPhoto, !resolvedServiceType.isEmpty {
-            let page = vehicle.referencePageCreating(kind: ReferencePage.serviceKind, name: resolvedServiceType,
-                                                     in: modelContext)
-            let photo = ReferencePhoto(data: keepPhoto,
-                                       caption: "Receipt, \(date.formatted(date: .abbreviated, time: .omitted))",
-                                       order: (page.photos ?? []).map(\.order).max().map { $0 + 1 } ?? 0)
-            modelContext.insert(photo)
-            photo.page = page
+        if let keepPhoto {
+            photos.append(PhotoDraft(data: keepPhoto,
+                                     caption: "Receipt, \(date.formatted(date: .abbreviated, time: .omitted))"))
         }
     }
 
@@ -545,20 +573,76 @@ struct MaintenanceEntryFormView: View {
         }
     }
 
-    private var notesField: some View {
-        HStack(alignment: .center) {
-            SmallCapsLabel("Notes")
-            TextField("Optional", text: $notes,
-                      prompt: Text("Optional").foregroundStyle(Theme.faint), axis: .vertical)
+    /// Notes and photos for next time; they show on the form whenever this
+    /// service is logged again.
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionTitle("Notes and photos") {
+                Text("Shown next time")
+                    .font(.dipstick(11.5, relativeTo: .caption))
+                    .foregroundStyle(Theme.muted)
+            }
+            TextField("Notes", text: $notes,
+                      prompt: Text("Torque specs, part numbers, what to have ready…").foregroundStyle(Theme.faint),
+                      axis: .vertical)
                 .font(.dipstick(15, relativeTo: .body))
                 .foregroundStyle(Theme.text)
-                .multilineTextAlignment(.trailing)
+                .lineLimit(3...)
+                .focused($notesFocused)
+                .padding(14)
+                .frame(maxWidth: .infinity, minHeight: 52, alignment: .topLeading)
+                .panel(radius: Theme.Radius.field, border: notesFocused ? Theme.accent : Theme.panelBorder,
+                       lineWidth: notesFocused ? 1.5 : 1)
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                ForEach(photos) { photo in
+                    Button {
+                        hideKeyboard()
+                        viewingPhoto = photo
+                    } label: {
+                        PhotoThumbnail(data: photo.data)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(photo.caption ?? "Photo")
+                }
+                Button {
+                    hideKeyboard()
+                    isChoosingPhotoSource = true
+                } label: {
+                    Color.clear
+                        .aspectRatio(1, contentMode: .fit)
+                        .overlay {
+                            VStack(spacing: 4) {
+                                Image(systemName: "photo.badge.plus").font(.system(size: 20, weight: .medium))
+                                Text("Add")
+                                    .font(.dipstick(12, .semibold, relativeTo: .caption))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(Theme.accentText)
+                        }
+                        .overlay(RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(Theme.panelBorder, style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add photos")
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(minHeight: 52)
-        .panel(radius: Theme.Radius.field)
         .padding(.top, 6)
+    }
+
+    private func addPickedPhotos() {
+        let items = pickedPhotos
+        guard !items.isEmpty else { return }
+        pickedPhotos = []
+        Task {
+            for item in items {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let small = await Task.detached(operation: { PhotoStore.downsized(data) }).value {
+                    photos.append(PhotoDraft(data: small))
+                }
+            }
+        }
     }
 
     private func hideKeyboard() {
@@ -568,6 +652,7 @@ struct MaintenanceEntryFormView: View {
         milesFocused = false
         monthsFocused = false
         focusedPart = nil
+        notesFocused = false
     }
 
     // MARK: Interval prefill
@@ -633,6 +718,22 @@ struct MaintenanceEntryFormView: View {
                                 partNumber: partNumber, quantity: draft.quantity)
             modelContext.insert(part)
             part.entry = target
+        }
+
+        // Photos: drop the ones removed, keep the rest in the form's order.
+        let kept = Set(photos.compactMap { $0.existing?.persistentModelID })
+        for old in target.photos ?? [] where !kept.contains(old.persistentModelID) {
+            modelContext.delete(old)
+        }
+        for (order, draft) in photos.enumerated() {
+            if let photo = draft.existing {
+                photo.order = order
+                photo.caption = draft.caption
+            } else if let data = draft.data {
+                let photo = ReferencePhoto(data: data, caption: draft.caption, order: order)
+                modelContext.insert(photo)
+                photo.entry = target
+            }
         }
 
         vehicle.recordOdometer(odometerValue)

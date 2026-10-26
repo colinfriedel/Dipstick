@@ -98,8 +98,15 @@ struct ScheduleItemDetailView: View {
                 }
             }
 
-            ReferenceSection(vehicle: vehicle, kind: ReferencePage.serviceKind, name: item.serviceType)
+            if vehicle.hasPastServiceNotes(ofType: item.serviceType) {
+                SectionTitle("Notes and photos") {
+                    Text("From past services")
+                        .font(.dipstick(11.5, relativeTo: .caption))
+                        .foregroundStyle(Theme.muted)
+                }
                 .padding(.top, 8)
+                PastServiceNotes(vehicle: vehicle, serviceType: item.serviceType)
+            }
         }
     }
 

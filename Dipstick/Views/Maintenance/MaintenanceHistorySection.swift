@@ -17,7 +17,7 @@ struct MaintenanceHistorySection: View {
     let onLog: () -> Void
     let onEdit: (MaintenanceEntry) -> Void
     let onSchedule: () -> Void
-    /// Opens a service type's notes and photos for next time.
+    /// Opens a service type's past notes and photos.
     let onReference: (String) -> Void
 
     @Environment(\.modelContext) private var modelContext
@@ -59,8 +59,8 @@ struct MaintenanceHistorySection: View {
             if !all.isEmpty {
                 searchRow.plainRow(top: 4, bottom: 4)
                 chipRow.plainRow(top: 4, bottom: 8)
-                if let typeFilter {
-                    ReferenceLink(vehicle: vehicle, kind: ReferencePage.serviceKind, name: typeFilter) {
+                if let typeFilter, vehicle.hasPastServiceNotes(ofType: typeFilter) {
+                    ServiceNotesLink(vehicle: vehicle, serviceType: typeFilter) {
                         isSearching = false
                         onReference(typeFilter)
                     }

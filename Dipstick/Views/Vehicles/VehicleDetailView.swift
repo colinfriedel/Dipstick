@@ -151,7 +151,7 @@ struct VehicleDetailView: View {
             MaintenanceEntryFormView(vehicle: vehicle, entry: entry)
         }
         .sheet(item: $referenceType) { target in
-            ReferencePageView(vehicle: vehicle, kind: ReferencePage.serviceKind, name: target.name)
+            ServiceNotesPage(vehicle: vehicle, serviceType: target.name)
         }
         .fullScreenCover(isPresented: $isLoggingTest) {
             TestEntryFormView(vehicle: vehicle)

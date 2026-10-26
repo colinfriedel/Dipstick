@@ -10,9 +10,9 @@ import ImageIO
 import UniformTypeIdentifiers
 
 /// "For next time": notes and photos (manual pages, parts, screenshots) for
-/// one service or test type on one car. Shown on a schedule item's page, a
-/// test's page, and from the service form. The page is only created once
-/// something is added.
+/// one test type on one car, on the test's page. The page is only created
+/// once something is added. (Services keep notes and photos on each logged
+/// service instead; see `PastServiceNotes`.)
 struct ReferenceSection: View {
     let vehicle: Vehicle
     let kind: String
@@ -173,6 +173,9 @@ struct PhotoThumbnail: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Theme.panelBorder, lineWidth: 1))
+            // Clipping only hides the overflow of a tall or wide photo; this
+            // stops the hidden part from taking taps meant for what's nearby.
+            .contentShape(RoundedRectangle(cornerRadius: 12))
             .task(id: data) {
                 guard let data else { return }
                 image = await Task.detached { PhotoStore.thumbnail(data, maxPixels: 400) }.value
@@ -320,79 +323,72 @@ private struct ZoomablePhoto: View {
     }
 }
 
-/// A reference page on its own (from the service form or the Maintenance
-/// tab), for service types without a schedule item page.
-struct ReferencePageView: View {
-    let vehicle: Vehicle
-    let kind: String
-    let name: String
+/// A photo not saved yet, on the service form.
+struct PhotoDraft: Identifiable {
+    let id = UUID()
+    var data: Data?
+    var caption: String?
+    /// The saved photo this stands for, when editing a service.
+    var existing: ReferencePhoto?
+}
+
+/// Full-screen view of the service form's photos before saving: swipe
+/// between them, pinch to zoom, caption, remove.
+struct DraftPhotoViewer: View {
+    @Binding var drafts: [PhotoDraft]
+    let start: UUID
+
     @Environment(\.dismiss) private var dismiss
+    @State private var current: UUID?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 14) {
-                    Button("Done") { dismiss() }
-                        .buttonStyle(SmallControlButtonStyle())
-                    vehicle.chip
-                    Text(name.uppercased())
-                        .font(.dipstick(15, .semibold, relativeTo: .headline))
-                        .tracking(2)
-                        .foregroundStyle(Theme.text)
-                        .lineLimit(1)
-                        .accessibilityAddTraits(.isHeader)
-                    Spacer()
+        ZStack(alignment: .top) {
+            Color.black.ignoresSafeArea()
+            TabView(selection: $current) {
+                ForEach(drafts) { draft in
+                    ZoomablePhoto(data: draft.data).tag(Optional(draft.id))
                 }
-                .padding(.bottom, 6)
-                ReferenceSection(vehicle: vehicle, kind: kind, name: name)
+            }
+            .tabViewStyle(.page(indexDisplayMode: drafts.count > 1 ? .automatic : .never))
+            .ignoresSafeArea()
+
+            HStack {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark").font(.system(size: 16, weight: .semibold))
+                }
+                .buttonStyle(SmallControlButtonStyle())
+                .accessibilityLabel("Close")
+                Spacer()
+                Button {
+                    guard let current else { return }
+                    dismiss()
+                    drafts.removeAll { $0.id == current }
+                } label: {
+                    Image(systemName: "trash").font(.system(size: 16, weight: .semibold))
+                }
+                .buttonStyle(SmallControlButtonStyle(foreground: Theme.red))
+                .accessibilityLabel("Remove photo")
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
-            .padding(.bottom, 24)
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .background(Theme.ground)
-    }
-}
 
-/// A row linking to a type's reference page: "Notes & photos for next
-/// time", with what's there ("3 photos · notes").
-struct ReferenceLink: View {
-    let vehicle: Vehicle
-    let kind: String
-    let name: String
-    let action: () -> Void
-
-    var body: some View {
-        let page = vehicle.referencePage(kind: kind, name: name)
-        let photoCount = page?.photos?.count ?? 0
-        let hasNotes = !(page?.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let summary = [photoCount > 0 ? "\(photoCount) photo\(photoCount == 1 ? "" : "s")" : nil,
-                       hasNotes ? "notes" : nil].compactMap { $0 }.joined(separator: " · ")
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: "book.pages")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Theme.muted)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("For next time")
-                        .font(.dipstick(14, .semibold, relativeTo: .subheadline))
+            if let index = drafts.firstIndex(where: { $0.id == current }) {
+                VStack {
+                    Spacer()
+                    TextField("Caption", text: Binding(get: { drafts[index].caption ?? "" },
+                                                       set: { drafts[index].caption = $0.isEmpty ? nil : $0 }),
+                              prompt: Text("Add a caption").foregroundStyle(Theme.faint), axis: .vertical)
+                        .font(.dipstick(14, relativeTo: .body))
                         .foregroundStyle(Theme.text)
-                    Text(summary.isEmpty ? "Add notes and photos for \(name.lowercased())" : summary)
-                        .font(.dipstick(12, relativeTo: .caption))
-                        .foregroundStyle(Theme.muted)
-                        .lineLimit(1)
+                        .lineLimit(1...4)
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(.black.opacity(0.6)))
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
                 }
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.faint)
             }
-            .padding(.horizontal, 14)
-            .frame(minHeight: 52)
-            .panel(radius: Theme.Radius.field)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .environment(\.colorScheme, .dark)
+        .onAppear { current = start }
     }
 }

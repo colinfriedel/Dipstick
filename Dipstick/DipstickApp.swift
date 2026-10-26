@@ -29,6 +29,7 @@ struct DipstickApp: App {
 
         do {
             let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            ServiceNotesMove.run(in: container.mainContext)
             #if DEBUG
             SampleData.seedIfRequested(into: container.mainContext)
             #endif

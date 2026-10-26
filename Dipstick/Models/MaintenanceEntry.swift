@@ -23,6 +23,11 @@ final class MaintenanceEntry {
     @Relationship(deleteRule: .cascade, inverse: \PartUsed.entry)
     var parts: [PartUsed]? = []
 
+    /// Photos for next time (manual pages, the part, the receipt), shown with
+    /// the notes whenever this service is logged again.
+    @Relationship(deleteRule: .cascade, inverse: \ReferencePhoto.entry)
+    var photos: [ReferencePhoto]? = []
+
     init(
         date: Date = Date(),
         odometer: Int,
@@ -39,6 +44,15 @@ final class MaintenanceEntry {
         self.notes = notes
         self.nextDueOdometer = nextDueOdometer
         self.nextDueDate = nextDueDate
+    }
+
+    var sortedPhotos: [ReferencePhoto] {
+        (photos ?? []).sorted { ($0.order, $0.addedAt) < ($1.order, $1.addedAt) }
+    }
+
+    /// True when there are notes or photos to show next time.
+    var hasNotesOrPhotos: Bool {
+        !(notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !(photos ?? []).isEmpty
     }
 
     var sortedParts: [PartUsed] {

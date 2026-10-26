@@ -6,8 +6,10 @@
 import Foundation
 import SwiftData
 
-/// Notes and photos for doing a service or test next time (manual pages,
-/// parts, reminders), one page per type per car. For tests it also holds the
+/// Notes and photos for doing a test next time (manual pages, parts,
+/// reminders), one page per type per car. Services used to have these too;
+/// their notes and photos now live on each logged service
+/// (`ServiceNotesMove` moves old pages over). For tests it also holds the
 /// spec from the manual and an optional reminder interval.
 @Model
 final class ReferencePage {
@@ -53,7 +55,7 @@ final class ReferencePage {
     }
 }
 
-/// A photo on a reference page. Stored outside the database file
+/// A photo on a test's reference page or a logged service. Stored outside the database file
 /// (`externalStorage`) so pages with many photos stay quick to load.
 @Model
 final class ReferencePhoto {
@@ -62,6 +64,7 @@ final class ReferencePhoto {
     var addedAt: Date = Date()
     var order: Int = 0
     var page: ReferencePage?
+    var entry: MaintenanceEntry?
 
     init(data: Data, caption: String? = nil, order: Int = 0) {
         self.data = data
