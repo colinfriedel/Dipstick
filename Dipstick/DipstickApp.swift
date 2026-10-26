@@ -53,6 +53,8 @@ struct DipstickApp: App {
         .onChange(of: scenePhase) {
             // Swiping the app away (or iOS closing it) can skip autosave.
             if scenePhase != .active { Self.modelContainer.mainContext.saveNow() }
+            // Back up whenever the app is put away with changes.
+            if scenePhase == .background { BackupManager.shared.backUp(context: Self.modelContainer.mainContext) }
         }
     }
 }

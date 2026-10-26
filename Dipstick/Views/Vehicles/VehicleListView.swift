@@ -30,6 +30,7 @@ struct VehicleListView: View {
 
     @State private var path: [Vehicle] = []
     @State private var isAdding = false
+    @State private var isShowingBackup = false
     @State private var vehicleToDelete: Vehicle?
     @State private var vehicleToFuel: Vehicle?
     @State private var serviceRequest: ServiceRequest?
@@ -111,6 +112,9 @@ struct VehicleListView: View {
             .fullScreenCover(isPresented: $isAdding) {
                 VehicleFormView()
             }
+            .sheet(isPresented: $isShowingBackup) {
+                BackupView()
+            }
             .fullScreenCover(item: $vehicleToFuel) { vehicle in
                 FillUpFlowView(vehicle: vehicle, startInScanner: true)
             }
@@ -142,6 +146,11 @@ struct VehicleListView: View {
                 .foregroundStyle(Theme.text)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
+            Button { isShowingBackup = true } label: {
+                Image(systemName: "externaldrive").font(.system(size: 17, weight: .medium))
+            }
+            .buttonStyle(SmallControlButtonStyle())
+            .accessibilityLabel("Backup")
             Button { isAdding = true } label: {
                 Image(systemName: "plus").font(.system(size: 18, weight: .medium))
             }
