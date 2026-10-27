@@ -31,6 +31,9 @@ struct VehicleListView: View {
     @State private var path: [Vehicle] = []
     @State private var isAdding = false
     @State private var isShowingBackup = false
+    @State private var quickActions = QuickActions.shared
+    @State private var isPickingFuelCar = false
+    @State private var pickedFuelCar: Vehicle?
     @State private var vehicleToDelete: Vehicle?
     @State private var vehicleToFuel: Vehicle?
     @State private var serviceRequest: ServiceRequest?
@@ -115,6 +118,19 @@ struct VehicleListView: View {
             .sheet(isPresented: $isShowingBackup) {
                 BackupView()
             }
+            .sheet(isPresented: $isPickingFuelCar, onDismiss: {
+                // Open the scanner once the picker has closed.
+                if let car = pickedFuelCar {
+                    pickedFuelCar = nil
+                    vehicleToFuel = car
+                }
+            }) {
+                FillUpCarPicker(vehicles: fuelCarChoices) { car in
+                    pickedFuelCar = car
+                    isPickingFuelCar = false
+                }
+            }
+            .onChange(of: quickActions.fillUpRequested, initial: true) { handleFillUpRequest() }
             .fullScreenCover(item: $vehicleToFuel) { vehicle in
                 FillUpFlowView(vehicle: vehicle, startInScanner: true)
             }
@@ -163,6 +179,36 @@ struct VehicleListView: View {
             }
             .buttonStyle(SmallControlButtonStyle(foreground: Theme.accent))
             .accessibilityLabel("Add vehicle")
+        }
+    }
+
+    /// Cars for a fill-up from Control Center: the connected one, then the
+    /// most recently used.
+    private var fuelCarChoices: [Vehicle] {
+        Vehicle.orderedForFillUp(vehicles, connected: Vehicle.matching(CarConnection.current(), in: modelContext))
+    }
+
+    /// "Log Fill-Up" from Control Center or Shortcuts: back to Home, then
+    /// straight to the pump scanner (one car) or a quick car picker first.
+    private func handleFillUpRequest() {
+        guard quickActions.fillUpRequested != nil else { return }
+        quickActions.fillUpRequested = nil
+        let wasShowingSomething = !path.isEmpty || isAdding || isShowingBackup || serviceRequest != nil
+            || vehicleToFuel != nil || isPickingFuelCar
+        path = []
+        isAdding = false
+        isShowingBackup = false
+        serviceRequest = nil
+        vehicleToFuel = nil
+        isPickingFuelCar = false
+        Task {
+            // Let anything that was open close first.
+            if wasShowingSomething { try? await Task.sleep(for: .milliseconds(600)) }
+            switch vehicles.count {
+            case 0: isAdding = true
+            case 1: vehicleToFuel = vehicles[0]
+            default: isPickingFuelCar = true
+            }
         }
     }
 

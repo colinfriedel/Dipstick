@@ -62,6 +62,12 @@ struct StopTripIntent: AppIntent {
 struct DipstickShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
+            intent: LogFillUpIntent(),
+            phrases: ["Log a fill-up in \(.applicationName)", "Log a \(.applicationName) fill-up"],
+            shortTitle: "Log Fill-Up",
+            systemImageName: "fuelpump.fill"
+        )
+        AppShortcut(
             intent: StartTripIntent(),
             phrases: ["Start a \(.applicationName) trip"],
             shortTitle: "Start Trip",

@@ -32,6 +32,10 @@ struct DipstickApp: App {
             ServiceNotesMove.run(in: container.mainContext)
             #if DEBUG
             SampleData.seedIfRequested(into: container.mainContext)
+            // Acts like the Control Center button, for testing in the simulator.
+            if ProcessInfo.processInfo.arguments.contains("-requestFillUp") {
+                QuickActions.shared.fillUpRequested = Date()
+            }
             #endif
             return container
         } catch {

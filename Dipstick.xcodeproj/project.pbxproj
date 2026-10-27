@@ -6,6 +6,10 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D1A0000C307DB80000FC06E6 /* DipstickControls.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D1A00002307DB80000FC06E6 /* DipstickControls.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		C4FF2FA2307DB73400FC06E6 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,12 +25,32 @@
 			remoteGlobalIDString = C4FF2F91307DB73200FC06E6;
 			remoteInfo = Dipstick;
 		};
+		D1A0000D307DB80000FC06E6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C4FF2F8A307DB73200FC06E6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D1A00001307DB80000FC06E6;
+			remoteInfo = DipstickControls;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D1A0000B307DB80000FC06E6 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = PlugIns;
+			files = (
+				D1A0000C307DB80000FC06E6 /* DipstickControls.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		C4FF2F92307DB73200FC06E6 /* Dipstick.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dipstick.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4FF2FA1307DB73400FC06E6 /* DipstickTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DipstickTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4FF2FAB307DB73400FC06E6 /* DipstickUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DipstickUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D1A00002307DB80000FC06E6 /* DipstickControls.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DipstickControls.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -43,6 +67,16 @@
 		C4FF2FAE307DB73400FC06E6 /* DipstickUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = DipstickUITests;
+			sourceTree = "<group>";
+		};
+		D1A00003307DB80000FC06E6 /* DipstickControls */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DipstickControls;
+			sourceTree = "<group>";
+		};
+		D1A00004307DB80000FC06E6 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -63,6 +97,11 @@
 			files = (
 			);
 		};
+		D1A00006307DB80000FC06E6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -71,6 +110,8 @@
 			children = (
 				C4FF2F94307DB73200FC06E6 /* Dipstick */,
 				C4FF2FA4307DB73400FC06E6 /* DipstickTests */,
+				D1A00003307DB80000FC06E6 /* DipstickControls */,
+				D1A00004307DB80000FC06E6 /* Shared */,
 				C4FF2FAE307DB73400FC06E6 /* DipstickUITests */,
 				C4FF2F93307DB73200FC06E6 /* Products */,
 			);
@@ -82,6 +123,7 @@
 				C4FF2F92307DB73200FC06E6 /* Dipstick.app */,
 				C4FF2FA1307DB73400FC06E6 /* DipstickTests.xctest */,
 				C4FF2FAB307DB73400FC06E6 /* DipstickUITests.xctest */,
+				D1A00002307DB80000FC06E6 /* DipstickControls.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -96,11 +138,16 @@
 				C4FF2F8E307DB73200FC06E6 /* Sources */,
 				C4FF2F8F307DB73200FC06E6 /* Frameworks */,
 				C4FF2F90307DB73200FC06E6 /* Resources */,
+				D1A0000B307DB80000FC06E6 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
+			dependencies = (
+				D1A0000E307DB80000FC06E6 /* PBXTargetDependency */,
+			);
 			fileSystemSynchronizedGroups = (
 				C4FF2F94307DB73200FC06E6 /* Dipstick */,
+				D1A00004307DB80000FC06E6 /* Shared */,
 			);
 			name = Dipstick;
 			productName = Dipstick;
@@ -149,6 +196,25 @@
 			productReference = C4FF2FAB307DB73400FC06E6 /* DipstickUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		D1A00001307DB80000FC06E6 /* DipstickControls */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D1A00008307DB80000FC06E6 /* Build configuration list for PBXNativeTarget "DipstickControls" */;
+			buildPhases = (
+				D1A00005307DB80000FC06E6 /* Sources */,
+				D1A00006307DB80000FC06E6 /* Frameworks */,
+				D1A00007307DB80000FC06E6 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				D1A00003307DB80000FC06E6 /* DipstickControls */,
+				D1A00004307DB80000FC06E6 /* Shared */,
+			);
+			name = DipstickControls;
+			productName = DipstickControls;
+			productReference = D1A00002307DB80000FC06E6 /* DipstickControls.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -170,6 +236,9 @@
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = C4FF2F91307DB73200FC06E6;
 					};
+					D1A00001307DB80000FC06E6 = {
+						CreatedOnToolsVersion = 27.0;
+					};
 				};
 			};
 			buildConfigurationList = C4FF2F8D307DB73200FC06E6 /* Build configuration list for PBXProject "Dipstick" */;
@@ -189,6 +258,7 @@
 				C4FF2F91307DB73200FC06E6 /* Dipstick */,
 				C4FF2FA0307DB73400FC06E6 /* DipstickTests */,
 				C4FF2FAA307DB73400FC06E6 /* DipstickUITests */,
+				D1A00001307DB80000FC06E6 /* DipstickControls */,
 			);
 		};
 /* End PBXProject section */
@@ -205,6 +275,11 @@
 			);
 		};
 		C4FF2FA9307DB73400FC06E6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		D1A00007307DB80000FC06E6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -227,6 +302,11 @@
 			files = (
 			);
 		};
+		D1A00005307DB80000FC06E6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -239,6 +319,11 @@
 			isa = PBXTargetDependency;
 			target = C4FF2F91307DB73200FC06E6 /* Dipstick */;
 			targetProxy = C4FF2FAC307DB73400FC06E6 /* PBXContainerItemProxy */;
+		};
+		D1A0000E307DB80000FC06E6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D1A00001307DB80000FC06E6 /* DipstickControls */;
+			targetProxy = D1A0000D307DB80000FC06E6 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -524,6 +609,66 @@
 			};
 			name = Release;
 		};
+		D1A00009307DB80000FC06E6 /* Debug configuration for PBXNativeTarget "DipstickControls" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7JB6DQH6B7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "DipstickControls-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Dipstick;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.colinfriedel.Dipstick.Controls;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D1A0000A307DB80000FC06E6 /* Release configuration for PBXNativeTarget "DipstickControls" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7JB6DQH6B7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "DipstickControls-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Dipstick;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.colinfriedel.Dipstick.Controls;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -556,6 +701,14 @@
 			buildConfigurations = (
 				C4FF2FBA307DB73400FC06E6 /* Debug configuration for PBXNativeTarget "DipstickUITests" */,
 				C4FF2FBB307DB73400FC06E6 /* Release configuration for PBXNativeTarget "DipstickUITests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		D1A00008307DB80000FC06E6 /* Build configuration list for PBXNativeTarget "DipstickControls" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D1A00009307DB80000FC06E6 /* Debug configuration for PBXNativeTarget "DipstickControls" */,
+				D1A0000A307DB80000FC06E6 /* Release configuration for PBXNativeTarget "DipstickControls" */,
 			);
 			defaultConfigurationName = Release;
 		};
