@@ -148,9 +148,16 @@ struct VehicleListView: View {
             Spacer()
             Button { isShowingBackup = true } label: {
                 Image(systemName: "externaldrive").font(.system(size: 17, weight: .medium))
+                    .overlay(alignment: .topTrailing) {
+                        // Until backups are in iCloud Drive, or when one failed
+                        // or isn't uploading.
+                        if backupNeedsAttention {
+                            Circle().fill(Theme.amber).frame(width: 8, height: 8).offset(x: 5, y: -4)
+                        }
+                    }
             }
             .buttonStyle(SmallControlButtonStyle())
-            .accessibilityLabel("Backup")
+            .accessibilityLabel(backupNeedsAttention ? "Backup, needs attention" : "Backup")
             Button { isAdding = true } label: {
                 Image(systemName: "plus").font(.system(size: 18, weight: .medium))
             }
@@ -158,6 +165,8 @@ struct VehicleListView: View {
             .accessibilityLabel("Add vehicle")
         }
     }
+
+    private var backupNeedsAttention: Bool { BackupManager.shared.needsAttention }
 
     private var emptyState: some View {
         VStack(spacing: 16) {

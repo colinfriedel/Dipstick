@@ -55,6 +55,8 @@ struct DipstickApp: App {
             if scenePhase != .active { Self.modelContainer.mainContext.saveNow() }
             // Back up whenever the app is put away with changes.
             if scenePhase == .background { BackupManager.shared.backUp(context: Self.modelContainer.mainContext) }
+            // See whether earlier backups made it to iCloud.
+            if scenePhase == .active { Task { await BackupManager.shared.checkUploads() } }
         }
     }
 }

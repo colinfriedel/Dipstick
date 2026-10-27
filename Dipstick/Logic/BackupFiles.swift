@@ -149,6 +149,53 @@ nonisolated enum BackupFiles {
         }
     }
 
+    // MARK: iCloud uploads
+
+    /// What iCloud says about the newest backup's files (its folder and the
+    /// photos): any upload errors, and when the oldest file still waiting
+    /// to upload was written.
+    struct UploadStatus {
+        var errors: [NSError] = []
+        var oldestWaiting: Date?
+    }
+
+    static func uploadStatus(in root: URL) -> UploadStatus {
+        guard let newest = list(in: root).first else { return UploadStatus() }
+        let photos = root.appending(path: photosFolder, directoryHint: .isDirectory)
+        let files = [(newest.url, (try? FileManager.default.contentsOfDirectory(atPath: newest.url.path(percentEncoded: false))) ?? []),
+                     (photos, (try? FileManager.default.contentsOfDirectory(atPath: photos.path(percentEncoded: false))) ?? [])]
+            .flatMap { folder, names in names.filter { !$0.hasPrefix(".") }.map { folder.appending(path: $0) } }
+
+        var status = UploadStatus()
+        for var url in files {
+            url.removeAllCachedResourceValues()
+            guard let values = try? url.resourceValues(forKeys: [
+                .isUbiquitousItemKey, .ubiquitousItemIsUploadedKey, .ubiquitousItemUploadingErrorKey,
+                .contentModificationDateKey,
+            ]), values.isUbiquitousItem == true else { continue }
+            if let error = values.ubiquitousItemUploadingError { status.errors.append(error) }
+            if values.ubiquitousItemIsUploaded == false, let written = values.contentModificationDate {
+                status.oldestWaiting = min(status.oldestWaiting ?? written, written)
+            }
+        }
+        return status
+    }
+
+    /// What to tell you if backups aren't reaching iCloud, or nil if they
+    /// are (or are only just written and still uploading).
+    static func uploadProblem(_ status: UploadStatus, now: Date = .now) -> String? {
+        if status.errors.contains(where: { $0.code == NSUbiquitousFileNotUploadedDueToQuotaError }) {
+            return "Backups aren't reaching iCloud because your iCloud storage is full. Until you free up space or upgrade your iCloud plan, new backups are only on this iPhone."
+        }
+        if let error = status.errors.first {
+            return "Backups aren't reaching iCloud (\(error.localizedDescription)). For now, new backups are only on this iPhone."
+        }
+        if let waiting = status.oldestWaiting, now.timeIntervalSince(waiting) > 24 * 3600 {
+            return "Backups haven't reached iCloud for over a day. Check that iCloud Drive is on and your iPhone is online. Until then, new backups are only on this iPhone."
+        }
+        return nil
+    }
+
     // MARK: Files
 
     /// True if the file is there, downloaded or not (iCloud keeps files it

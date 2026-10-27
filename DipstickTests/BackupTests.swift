@@ -179,3 +179,25 @@ struct BackupTests {
         #expect(Set(after) == Set(snapshot.photos.keys))
     }
 }
+
+@MainActor
+struct BackupUploadTests {
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test func fineWhenUploadedOrJustWritten() {
+        #expect(BackupFiles.uploadProblem(.init(), now: now) == nil)
+        #expect(BackupFiles.uploadProblem(.init(oldestWaiting: now.addingTimeInterval(-3600)), now: now) == nil)
+    }
+
+    @Test func fullICloudStorageIsNamed() {
+        let quota = NSError(domain: NSCocoaErrorDomain, code: NSUbiquitousFileNotUploadedDueToQuotaError)
+        let other = NSError(domain: NSCocoaErrorDomain, code: NSUbiquitousFileUbiquityServerNotAvailable)
+        #expect(BackupFiles.uploadProblem(.init(errors: [other, quota]), now: now)?.contains("storage is full") == true)
+        #expect(BackupFiles.uploadProblem(.init(errors: [other]), now: now)?.hasPrefix("Backups aren't reaching iCloud (") == true)
+    }
+
+    @Test func waitingOverADayIsAProblem() {
+        let status = BackupFiles.UploadStatus(oldestWaiting: now.addingTimeInterval(-25 * 3600))
+        #expect(BackupFiles.uploadProblem(status, now: now)?.contains("over a day") == true)
+    }
+}

@@ -19,8 +19,41 @@ final class BackupManager {
     /// Why the last backup didn't go where it should, if it didn't.
     private(set) var problem: String?
     private(set) var isWorking = false
+    /// Set when backups are saved to iCloud Drive but aren't uploading
+    /// (iCloud storage full, offline for a day…).
+    private(set) var uploadProblem: String?
+
+    /// Backups aren't fully protected, or something went wrong.
+    var needsAttention: Bool { place != .iCloud || problem != nil || uploadProblem != nil }
     /// The picked folder's name, or nil when backing up on this iPhone.
     private(set) var folderName: String?
+    /// What kind of place backups go to, which decides what they survive.
+    private(set) var place: Place = .appFolder
+
+    enum Place {
+        /// Dipstick's own folder: deleted along with the app.
+        case appFolder
+        /// iCloud Drive: survives deleting the app and losing the phone.
+        case iCloud
+        /// Some other folder (on this iPhone or another app's storage).
+        case otherFolder
+
+        /// Whether backups here survive each thing that can go wrong.
+        var survivesAppDeleted: Bool { self != .appFolder }
+        /// nil = depends on the folder (on the iPhone or in a cloud service).
+        var survivesPhoneLost: Bool? {
+            switch self {
+            case .appFolder: false
+            case .iCloud: true
+            case .otherFolder: nil
+            }
+        }
+    }
+
+    static func isInICloud(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isUbiquitousItemKey]).isUbiquitousItem) == true
+            || url.path(percentEncoded: false).contains("/Mobile Documents/")
+    }
 
     private let defaults: UserDefaults
     private enum Key {
@@ -35,7 +68,12 @@ final class BackupManager {
         self.defaults = defaults
         lastBackup = defaults.object(forKey: Key.lastBackup) as? Date
         problem = defaults.string(forKey: Key.problem)
-        folderName = defaults.data(forKey: Key.bookmark) == nil ? nil : defaults.string(forKey: Key.folderName)
+        if let bookmark = defaults.data(forKey: Key.bookmark) {
+            folderName = defaults.string(forKey: Key.folderName)
+            var stale = false
+            let url = try? URL(resolvingBookmarkData: bookmark, bookmarkDataIsStale: &stale)
+            place = url.map { Self.isInICloud($0) ? .iCloud : .otherFolder } ?? .otherFolder
+        }
     }
 
     // MARK: Where
@@ -81,6 +119,7 @@ final class BackupManager {
         defaults.set(bookmark, forKey: Key.bookmark)
         defaults.set(url.lastPathComponent, forKey: Key.folderName)
         folderName = url.lastPathComponent
+        place = Self.isInICloud(url) ? .iCloud : .otherFolder
         forgetFingerprint()
         backUp(context: context, force: true)
     }
@@ -90,6 +129,7 @@ final class BackupManager {
         defaults.removeObject(forKey: Key.bookmark)
         defaults.removeObject(forKey: Key.folderName)
         folderName = nil
+        place = .appFolder
         forgetFingerprint()
         backUp(context: context, force: true)
     }
@@ -160,6 +200,17 @@ final class BackupManager {
             problem = "Backup failed: \(error.localizedDescription)"
         }
         defaults.set(problem, forKey: Key.problem)
+    }
+
+    /// Checks whether the newest backup has reached iCloud. Run when the
+    /// app opens and on the backup screen.
+    func checkUploads() async {
+        guard place == .iCloud else { uploadProblem = nil; return }
+        let location = location
+        let status = await Task.detached {
+            (try? location.withRoot { BackupFiles.uploadStatus(in: $0) }) ?? BackupFiles.UploadStatus()
+        }.value
+        uploadProblem = BackupFiles.uploadProblem(status)
     }
 
     // MARK: Restoring

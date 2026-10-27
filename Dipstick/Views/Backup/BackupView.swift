@@ -36,6 +36,7 @@ struct BackupView: View {
                 .padding(.bottom, 6)
 
                 statusPanel
+                protectionPanel
                 locationPanel
 
                 Button {
@@ -59,7 +60,10 @@ struct BackupView: View {
             .padding(.bottom, 24)
         }
         .background(Theme.ground)
-        .task(id: "\(manager.folderName ?? "")\(manager.lastBackup?.timeIntervalSince1970 ?? 0)") { await refresh() }
+        .task(id: "\(manager.folderName ?? "")\(manager.lastBackup?.timeIntervalSince1970 ?? 0)") {
+            await refresh()
+            await manager.checkUploads()
+        }
         .fileImporter(isPresented: $isPickingFolder, allowedContentTypes: [.folder]) { result in
             switch result {
             case .success(let url):
@@ -114,10 +118,59 @@ struct BackupView: View {
         .panel(radius: Theme.Radius.field)
     }
 
+    /// What the backups survive where they are now, and what to do to be
+    /// fully protected.
+    private var protectionPanel: some View {
+        let place = manager.place
+        let uploadProblem = manager.uploadProblem
+        let fullyProtected = place == .iCloud && uploadProblem == nil
+        return VStack(alignment: .leading, spacing: 10) {
+            SmallCapsLabel("Your data is safe if…")
+            protectionRow("The app has a problem or data goes wrong", safe: true)
+            protectionRow("Dipstick is deleted", safe: place.survivesAppDeleted)
+            // Newest backups not in iCloud yet are lost with the phone.
+            protectionRow("Your iPhone is lost or replaced", safe: uploadProblem == nil ? place.survivesPhoneLost : false)
+            Text(uploadProblem ?? advice(for: place))
+                .font(.dipstick(13, relativeTo: .footnote))
+                .foregroundStyle(fullyProtected ? Theme.muted : Theme.text)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .panel(radius: Theme.Radius.field, border: fullyProtected ? Theme.panelBorder : Theme.amber.opacity(0.6))
+    }
+
+    /// safe: true = yes, false = no, nil = depends on the folder.
+    private func protectionRow(_ text: String, safe: Bool?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: safe == true ? "checkmark.circle.fill" : safe == false ? "xmark.circle.fill" : "questionmark.circle.fill")
+                .foregroundStyle(safe == true ? Theme.muted : safe == false ? Theme.red : Theme.amber)
+            Text(text)
+                .font(.dipstick(14, relativeTo: .body))
+                .foregroundStyle(Theme.text)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(text): \(safe == true ? "yes" : safe == false ? "no" : "depends on the folder")")
+    }
+
+    private func advice(for place: BackupManager.Place) -> String {
+        switch place {
+        case .appFolder:
+            "Backups are only in Dipstick's own folder, which is erased if the app is deleted. To protect your data: tap Choose a folder below, tap iCloud Drive, make a new folder (for example \"Dipstick\"), then tap Open."
+        case .iCloud:
+            "Fully protected. Keep iCloud Drive turned on (Settings › your name › iCloud) with some free iCloud storage. Backups upload whenever your iPhone is online."
+        case .otherFolder:
+            "This folder isn't in iCloud Drive. If it's On My iPhone, it goes with the phone unless your iPhone itself is backed up. To be fully protected, choose a folder in iCloud Drive instead."
+        }
+    }
+
     private var locationPanel: some View {
         VStack(spacing: 0) {
             FormRow("Saved to", subtitle: manager.folderName == nil ? "Files › On My iPhone › Dipstick" : nil) {
-                Text(manager.folderName.map { "\($0) › \(BackupFiles.folderName)" } ?? "This iPhone")
+                Text(manager.folderName.map {
+                    (manager.place == .iCloud ? "iCloud Drive › " : "") + "\($0) › \(BackupFiles.folderName)"
+                } ?? "Dipstick's folder")
                     .font(.dipstick(14, relativeTo: .body))
                     .foregroundStyle(Theme.text)
                     .multilineTextAlignment(.trailing)
@@ -140,7 +193,7 @@ struct BackupView: View {
                 Button {
                     manager.useThisPhone(context: modelContext)
                 } label: {
-                    Label("Save on this iPhone instead", systemImage: "iphone")
+                    Label("Save in Dipstick's folder instead", systemImage: "iphone")
                         .font(.dipstick(14, .semibold, relativeTo: .body))
                         .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
