@@ -10,7 +10,7 @@ import SwiftData
 /// described in docs/csv-format.md. Works on plain row values so it can be
 /// tested without SwiftData; the Vehicle extension at the bottom bridges to the
 /// models.
-enum RecordCSV {
+nonisolated enum RecordCSV {
     static let columns = [
         "type", "date", "odometer", "gallons", "total_cost", "full_tank", "station",
         "service", "parts", "next_due_odometer", "next_due_date", "notes",
@@ -377,7 +377,7 @@ enum RecordCSV {
     }
 }
 
-private extension String {
+nonisolated private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 

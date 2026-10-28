@@ -7,7 +7,7 @@ import Foundation
 
 /// The single place that turns numbers into display strings, so switching to
 /// km / liters later means changing this file only.
-enum Units {
+nonisolated enum Units {
     static func miles(_ value: Int) -> String {
         "\(value.formatted()) mi"
     }

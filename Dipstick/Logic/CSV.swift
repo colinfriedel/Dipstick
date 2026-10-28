@@ -8,7 +8,7 @@ import Foundation
 /// Minimal CSV reading and writing (RFC 4180): comma-separated, fields may be
 /// wrapped in double quotes, `""` is a literal quote, quoted fields may contain
 /// commas and line breaks.
-enum CSV {
+nonisolated enum CSV {
     static func parse(_ text: String) -> [[String]] {
         var rows: [[String]] = []
         var row: [String] = []

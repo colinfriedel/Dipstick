@@ -41,7 +41,7 @@ enum FactorySchedule {
         }
 
         /// 36 → "3 yr", 18 → "18 mo".
-        static func monthsText(_ months: Int) -> String {
+        nonisolated static func monthsText(_ months: Int) -> String {
             months % 12 == 0 ? "\(months / 12) yr" : "\(months) mo"
         }
     }

@@ -115,7 +115,7 @@ extension Font {
 
 extension Color {
     /// A fixed color from a 0xRRGGBB value.
-    init(hex: UInt32) {
+    nonisolated init(hex: UInt32) {
         self.init(
             red: Double((hex >> 16) & 0xFF) / 255,
             green: Double((hex >> 8) & 0xFF) / 255,
@@ -131,7 +131,7 @@ extension Color {
     }
 
     /// Parses "#RRGGBB" or "RRGGBB" (for `Vehicle.colorHex`).
-    init?(hexString: String) {
+    nonisolated init?(hexString: String) {
         let digits = hexString.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
         guard digits.count == 6, let value = UInt32(digits, radix: 16) else { return nil }
         self.init(hex: value)

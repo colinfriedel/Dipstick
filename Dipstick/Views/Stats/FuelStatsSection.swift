@@ -10,7 +10,7 @@ import Charts
 /// Stats tab of vehicle detail (design board F / P, with City · Highway ·
 /// Combined tiles in place of the board's summary tiles, which now live on
 /// the Fuel tab): city/highway MPG with current-tank progress, the MPG trend
-/// chart, and fuel spend. Debug builds add a collapsed trips testing row.
+/// chart, fuel spend, and the car's recorded drives.
 struct FuelStatsSection: View {
     let vehicle: Vehicle
 
@@ -28,9 +28,9 @@ struct FuelStatsSection: View {
     }
 
     @State private var range: Range = .all
-    #if DEBUG
     @State private var isShowingTrips = false
-    #endif
+    @State private var isShowingRecorder = false
+    @Environment(TripRecorder.self) private var recorder
 
     var body: some View {
         let stats = vehicle.fuelStats()
@@ -70,17 +70,27 @@ struct FuelStatsSection: View {
                     .plainRow(top: 2, bottom: 6)
             }
 
-            #if DEBUG
-            DebugDashedRow(title: "Trips (testing)") { isShowingTrips = true }
-                .plainRow(top: 14, bottom: 16)
-                .sheet(isPresented: $isShowingTrips) {
-                    NavigationStack {
-                        List { TripTestingSection(vehicle: vehicle) }
-                            .navigationTitle("Trips (testing)")
-                            .navigationBarTitleDisplayMode(.inline)
-                    }
-                }
-            #endif
+            SectionTitle("Drives") {
+                Text("For city and highway MPG")
+                    .font(.dipstick(11.5, relativeTo: .caption))
+                    .foregroundStyle(Theme.muted)
+            }
+            .plainRow(top: 14, bottom: 6)
+            LocationAccessNotice()
+                .plainRow(top: 0, bottom: 8)
+            // The sheets sit on this row, not the Section: a modifier on a
+            // Section is copied onto every row.
+            DrivesPanel(vehicle: vehicle, onShowAll: { isShowingTrips = true }) {
+                if !recorder.isRecording { recorder.start(for: vehicle) }
+                isShowingRecorder = true
+            }
+            .plainRow(top: 0, bottom: 16)
+            .sheet(isPresented: $isShowingTrips) {
+                TripsListView(vehicle: vehicle)
+            }
+            .fullScreenCover(isPresented: $isShowingRecorder) {
+                TripRecordingView()
+            }
         }
     }
 

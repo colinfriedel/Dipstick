@@ -3,7 +3,7 @@
 //  Dipstick
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 import CoreImage
 import ImageIO
 import SwiftUI

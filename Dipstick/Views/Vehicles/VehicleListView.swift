@@ -37,10 +37,8 @@ struct VehicleListView: View {
     @State private var vehicleToDelete: Vehicle?
     @State private var vehicleToFuel: Vehicle?
     @State private var serviceRequest: ServiceRequest?
-    #if DEBUG
     @Query(filter: #Predicate<Trip> { $0.vehicle == nil }) private var unassignedTrips: [Trip]
     @State private var isShowingUnassigned = false
-    #endif
 
     /// Everything due soon or overdue, most overdue first across all vehicles.
     private var dueRows: [DueRow] {
@@ -95,14 +93,10 @@ struct VehicleListView: View {
                     .plainRow()
                 }
 
-                #if DEBUG
                 if !unassignedTrips.isEmpty {
-                    DebugDashedRow(title: "Unassigned trips (testing) · \(unassignedTrips.count)") {
-                        isShowingUnassigned = true
-                    }
-                    .plainRow(top: 18)
+                    UnassignedTripsRow(count: unassignedTrips.count) { isShowingUnassigned = true }
+                        .plainRow(top: 16)
                 }
-                #endif
             }
             .listStyle(.plain)
             .environment(\.defaultMinListRowHeight, 1)
@@ -137,15 +131,9 @@ struct VehicleListView: View {
             .fullScreenCover(item: $serviceRequest) { request in
                 MaintenanceEntryFormView(vehicle: request.vehicle, serviceType: request.serviceType)
             }
-            #if DEBUG
             .sheet(isPresented: $isShowingUnassigned) {
-                NavigationStack {
-                    List { UnassignedTripsSection() }
-                        .navigationTitle("Unassigned Trips")
-                        .navigationBarTitleDisplayMode(.inline)
-                }
+                UnassignedTripsView()
             }
-            #endif
             .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in
                 modelContext.delete(vehicle)
                 modelContext.saveNow()
@@ -359,32 +347,6 @@ private struct ServiceLampRow: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// A dashed, out-of-the-way row for Debug-only tools.
-struct DebugDashedRow: View {
-    let title: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Text(title)
-                    .font(.dipstick(13, relativeTo: .footnote))
-                    .foregroundStyle(Theme.muted)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.faint)
-            }
-            .padding(.horizontal, 16)
-            .frame(minHeight: 48)
-            .overlay(RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Theme.panelBorder, style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.borderless)
     }
 }
 
