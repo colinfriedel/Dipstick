@@ -272,7 +272,7 @@ private struct CaptionField: View {
 }
 
 /// One photo, fit to the screen, pinch or double-tap to zoom.
-private struct ZoomablePhoto: View {
+struct ZoomablePhoto: View {
     let data: Data?
     @State private var image: CGImage?
     @State private var scale: CGFloat = 1

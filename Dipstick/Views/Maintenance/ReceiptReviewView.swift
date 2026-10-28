@@ -314,7 +314,7 @@ struct ReceiptReviewView: View {
 /// Opened right as the photo picker closes, a full-screen cover can be laid
 /// out with no top safe area, putting Cancel under the status bar. If so,
 /// pad by the window's own inset.
-private struct TopSafeAreaFallback: ViewModifier {
+struct TopSafeAreaFallback: ViewModifier {
     @State private var missing: CGFloat = 0
 
     func body(content: Content) -> some View {

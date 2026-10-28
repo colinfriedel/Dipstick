@@ -113,7 +113,7 @@ nonisolated enum ReceiptParser {
             let lower = box.text.lowercased()
             return !pieceNoise.contains { lower.hasPrefix($0) || lower == $0 }
         }
-        struct Piece { let text: String; let x: Double; let y: Double; let height: Double }
+        struct Piece { let text: String; let x: Double; let right: Double; let y: Double; let height: Double }
         func center(_ box: TextBox) -> CGPoint {
             let c = [box.topLeft, box.topRight, box.bottomLeft, box.bottomRight].map(scaled)
             return CGPoint(x: c.map(\.x).reduce(0, +) / 4, y: c.map(\.y).reduce(0, +) / 4)
@@ -123,17 +123,22 @@ nonisolated enum ReceiptParser {
             return kept.map { box -> Piece in
                 let c = center(box)
                 let left = (scaled(box.topLeft).x + scaled(box.bottomLeft).x) / 2
+                let right = (scaled(box.topRight).x + scaled(box.bottomRight).x) / 2
                 let height = hypot(scaled(box.topLeft).x - scaled(box.bottomLeft).x,
                                    scaled(box.topLeft).y - scaled(box.bottomLeft).y)
-                return Piece(text: box.text, x: left * cosA - c.y * sinA,
+                return Piece(text: box.text, x: left * cosA - c.y * sinA, right: right * cosA - c.y * sinA,
                              y: c.x * sinA + c.y * cosA, height: max(height, 0.001))
             }.sorted { $0.y > $1.y }
         }
         func group(_ pieces: [Piece]) -> [[Piece]] {
             var rows: [[Piece]] = []
             for piece in pieces {
+                // Pieces on one line never overlap side to side; if they
+                // would, they're from neighboring lines (a wide page at the
+                // wrong tilt).
                 if let row = rows.last, let first = row.first,
-                   abs(first.y - piece.y) < min(first.height, piece.height) * 0.55 {
+                   abs(first.y - piece.y) < min(first.height, piece.height) * 0.55,
+                   !row.contains(where: { min($0.right, piece.right) - max($0.x, piece.x) > 0.25 * piece.height }) {
                     rows[rows.count - 1].append(piece)
                 } else {
                     rows.append([piece])

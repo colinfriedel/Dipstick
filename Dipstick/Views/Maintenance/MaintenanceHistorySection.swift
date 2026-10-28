@@ -19,6 +19,8 @@ struct MaintenanceHistorySection: View {
     let onSchedule: () -> Void
     /// Opens a service type's past notes and photos.
     let onReference: (String) -> Void
+    /// Import records from photos, PDFs or spreadsheets.
+    let onImport: () -> Void
 
     @Environment(\.modelContext) private var modelContext
     @State private var query = ""
@@ -68,8 +70,28 @@ struct MaintenanceHistorySection: View {
                 }
             }
 
-            if shown.isEmpty {
-                Text(all.isEmpty ? "No services logged yet." : "No services match.")
+            if all.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("No services logged yet.")
+                        .font(.dipstick(14, relativeTo: .subheadline))
+                        .foregroundStyle(Theme.muted)
+                    Button {
+                        isSearching = false
+                        onImport()
+                    } label: {
+                        Label("Import past records", systemImage: "doc.text.viewfinder")
+                            .font(.dipstick(14, .semibold, relativeTo: .body))
+                            .foregroundStyle(Theme.accentText)
+                    }
+                    .buttonStyle(.borderless)
+                    Text("From photos or screenshots of invoices, a Carfax report, a PDF or a spreadsheet.")
+                        .font(.dipstick(12, relativeTo: .caption))
+                        .foregroundStyle(Theme.muted)
+                }
+                .padding(.vertical, 4)
+                .panelRow(.only)
+            } else if shown.isEmpty {
+                Text("No services match.")
                     .font(.dipstick(14, relativeTo: .subheadline))
                     .foregroundStyle(Theme.muted)
                     .panelRow(.only)

@@ -50,6 +50,7 @@ struct VehicleDetailView: View {
     @State private var isShowingSchedule = false
     @State private var isImporting = false
     @State private var importFile: ImportFile?
+    @State private var isImportingRecords = false
     @State private var importError: String?
 
     /// A CSV the user picked, parsed and waiting for confirmation.
@@ -84,7 +85,8 @@ struct VehicleDetailView: View {
                         onLog: { isLoggingService = true },
                         onEdit: { editingServiceEntry = $0 },
                         onSchedule: { isShowingSchedule = true },
-                        onReference: { referenceType = ReferenceTarget(name: $0) }
+                        onReference: { referenceType = ReferenceTarget(name: $0) },
+                        onImport: { isImportingRecords = true }
                     )
                 case .testing:
                     TestingSection(
@@ -114,6 +116,15 @@ struct VehicleDetailView: View {
             allowedContentTypes: [.commaSeparatedText, .plainText]
         ) { result in
             readImport(result)
+        }
+        .fullScreenCover(isPresented: $isImportingRecords) {
+            RecordImportView(vehicle: vehicle) { filename, parsed in
+                // A Dipstick CSV: open the CSV import once this has closed.
+                Task {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    importFile = ImportFile(filename: filename, parsed: parsed)
+                }
+            }
         }
         .fullScreenCover(item: $importFile) { file in
             ImportPreviewView(vehicle: vehicle, filename: file.filename, parsed: file.parsed) {
@@ -185,7 +196,7 @@ struct VehicleDetailView: View {
                 ShareLink(item: vehicle.csvExportFile, preview: SharePreview("\(vehicle.name) records")) {
                     Label("Export CSV", systemImage: "square.and.arrow.up")
                 }
-                Button("Import CSV…", systemImage: "square.and.arrow.down") { isImporting = true }
+                Button("Import Records…", systemImage: "square.and.arrow.down") { isImportingRecords = true }
                 Divider()
                 Button("Delete Vehicle", systemImage: "trash", role: .destructive) { vehicleToDelete = vehicle }
             } label: {
