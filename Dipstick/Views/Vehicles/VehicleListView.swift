@@ -125,6 +125,10 @@ struct VehicleListView: View {
                 }
             }
             .onChange(of: quickActions.fillUpRequested, initial: true) { handleFillUpRequest() }
+            // Keep the Control Center's list of cars current.
+            .onChange(of: vehicles.map { "\($0.name)|\($0.mpgSummary.latest ?? 0)" }, initial: true) {
+                CarDirectory.update(from: vehicles)
+            }
             .fullScreenCover(item: $vehicleToFuel) { vehicle in
                 FillUpFlowView(vehicle: vehicle, startInScanner: true)
             }
@@ -181,6 +185,8 @@ struct VehicleListView: View {
     private func handleFillUpRequest() {
         guard quickActions.fillUpRequested != nil else { return }
         quickActions.fillUpRequested = nil
+        let carID = quickActions.fillUpCarID
+        quickActions.fillUpCarID = nil
         let wasShowingSomething = !path.isEmpty || isAdding || isShowingBackup || serviceRequest != nil
             || vehicleToFuel != nil || isPickingFuelCar
         path = []
@@ -192,6 +198,11 @@ struct VehicleListView: View {
         Task {
             // Let anything that was open close first.
             if wasShowingSomething { try? await Task.sleep(for: .milliseconds(600)) }
+            // A per-car button goes straight to that car's scanner.
+            if let id = carID, let car = vehicles.first(where: { $0.directoryID == id }) {
+                vehicleToFuel = car
+                return
+            }
             switch vehicles.count {
             case 0: isAdding = true
             case 1: vehicleToFuel = vehicles[0]

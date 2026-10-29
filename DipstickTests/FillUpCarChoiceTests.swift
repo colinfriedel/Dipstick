@@ -32,3 +32,33 @@ struct FillUpCarChoiceTests {
         #expect(Vehicle.orderedForFillUp([acura, civic, truck], connected: truck).map(\.name) == ["Truck", "Civic", "Acura"])
     }
 }
+
+@MainActor
+struct CarDirectoryTests {
+    @Test func eachCarHasItsOwnStableID() throws {
+        let context = ModelContext(try ModelContainer(for: Vehicle.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+        let a = Vehicle(name: "Acura"), b = Vehicle(name: "Lexus")
+        context.insert(a)
+        context.insert(b)
+        try context.save()
+        // The same every time (the encoder's field order isn't fixed on its own).
+        #expect(Set((0..<20).map { _ in a.directoryID }).count == 1)
+        #expect(a.directoryID != b.directoryID)
+        let fetched = try context.fetch(FetchDescriptor<Vehicle>()).first { $0.name == "Acura" }
+        #expect(fetched?.directoryID == a.directoryID)
+    }
+}
+
+struct FillUpLinkTests {
+    @Test func linksRoundTripTheCar() throws {
+        let id = "eyJpbXBsZW1lbnRhdGlvbiI6+/="
+        let url = CarDirectory.fillUpURL(carID: id)
+        #expect(url.absoluteString.hasPrefix("dipstick://fillup?car="))
+        let parsed = try #require(CarDirectory.carID(inFillUpURL: url))
+        #expect(parsed == id)
+        let ask = try #require(CarDirectory.carID(inFillUpURL: CarDirectory.fillUpURL(carID: nil)))
+        #expect(ask == nil)
+        #expect(CarDirectory.carID(inFillUpURL: URL(string: "dipstick://backup")!) == nil)
+        #expect(CarDirectory.carID(inFillUpURL: URL(string: "https://fillup")!) == nil)
+    }
+}

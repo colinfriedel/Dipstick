@@ -36,6 +36,14 @@ struct DipstickApp: App {
             if ProcessInfo.processInfo.arguments.contains("-requestFillUp") {
                 QuickActions.shared.fillUpRequested = Date()
             }
+            // Acts like a per-car button: -requestFillUpFor "Car name".
+            let arguments = ProcessInfo.processInfo.arguments
+            if let i = arguments.firstIndex(of: "-requestFillUpFor"), i + 1 < arguments.count,
+               let car = ((try? container.mainContext.fetch(FetchDescriptor<Vehicle>())) ?? [])
+                .first(where: { $0.name == arguments[i + 1] }) {
+                QuickActions.shared.fillUpCarID = car.directoryID
+                QuickActions.shared.fillUpRequested = Date()
+            }
             #endif
             return container
         } catch {
@@ -48,6 +56,12 @@ struct DipstickApp: App {
     var body: some Scene {
         WindowGroup {
             VehicleListView()
+                // Lock Screen widget: dipstick://fillup?car=ID.
+                .onOpenURL { url in
+                    guard let carID = CarDirectory.carID(inFillUpURL: url) else { return }
+                    QuickActions.shared.fillUpCarID = carID
+                    QuickActions.shared.fillUpRequested = Date()
+                }
                 .environment(TripRecorder.shared)
                 // Supports large accessibility sizes; the two very largest
                 // make number readouts unusable on a phone screen.

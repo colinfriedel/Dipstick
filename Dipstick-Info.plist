@@ -2,12 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Bundled open-license fonts (Dipstick/Resources/Fonts, see the OFL files there). -->
 	<key>UIAppFonts</key>
 	<array>
 		<string>ChakraPetch-Medium.ttf</string>
 		<string>ChakraPetch-SemiBold.ttf</string>
 		<string>ShareTechMono-Regular.ttf</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.colinfriedel.Dipstick</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>dipstick</string>
+			</array>
+		</dict>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>
