@@ -38,6 +38,7 @@ nonisolated struct BackupData: Codable, Equatable {
         var schedule: [ScheduleRecord] = []
         var tests: [TestRecord] = []
         var pages: [PageRecord] = []
+        var syncID: String? = nil
     }
 
     struct FuelRecord: Codable, Equatable {
@@ -48,6 +49,8 @@ nonisolated struct BackupData: Codable, Equatable {
         var isFullTank: Bool
         var station: String?
         var notes: String?
+        var syncID: String? = nil
+        var addedBy: String? = nil
     }
 
     struct ServiceRecord: Codable, Equatable {
@@ -60,6 +63,8 @@ nonisolated struct BackupData: Codable, Equatable {
         var nextDueDate: Date?
         var parts: [PartRecord] = []
         var photos: [PhotoRecord] = []
+        var syncID: String? = nil
+        var addedBy: String? = nil
     }
 
     struct PartRecord: Codable, Equatable {
@@ -67,6 +72,7 @@ nonisolated struct BackupData: Codable, Equatable {
         var cost: Double
         var partNumber: String?
         var quantity: Int
+        var syncID: String? = nil
     }
 
     struct PhotoRecord: Codable, Equatable {
@@ -75,6 +81,7 @@ nonisolated struct BackupData: Codable, Equatable {
         var caption: String?
         var addedAt: Date
         var order: Int
+        var syncID: String? = nil
     }
 
     struct TripRecord: Codable, Equatable {
@@ -85,6 +92,8 @@ nonisolated struct BackupData: Codable, Equatable {
         var status: String
         var connectionName: String?
         var connectionID: String?
+        var syncID: String? = nil
+        var addedBy: String? = nil
     }
 
     struct ScheduleRecord: Codable, Equatable {
@@ -98,6 +107,7 @@ nonisolated struct BackupData: Codable, Equatable {
         var customEveryMonths: Int?
         var note: String?
         var order: Int
+        var syncID: String? = nil
     }
 
     struct TestRecord: Codable, Equatable {
@@ -106,6 +116,8 @@ nonisolated struct BackupData: Codable, Equatable {
         var testType: String
         var notes: String?
         var readings: [ReadingRecord] = []
+        var syncID: String? = nil
+        var addedBy: String? = nil
     }
 
     struct ReadingRecord: Codable, Equatable {
@@ -115,6 +127,7 @@ nonisolated struct BackupData: Codable, Equatable {
         var unit: String
         var text: String?
         var order: Int
+        var syncID: String? = nil
     }
 
     struct PageRecord: Codable, Equatable {
@@ -127,6 +140,7 @@ nonisolated struct BackupData: Codable, Equatable {
         var remindEveryMonths: Int?
         var remindEveryMiles: Int?
         var photos: [PhotoRecord] = []
+        var syncID: String? = nil
     }
 
     var isEmpty: Bool { vehicles.isEmpty && unassignedTrips.isEmpty }
@@ -220,14 +234,15 @@ extension BackupSnapshot {
             guard let bytes = photo.data else { return nil }
             let name = photoFileName(for: bytes)
             photos[name] = bytes
-            return .init(file: name, caption: photo.caption, addedAt: photo.addedAt, order: photo.order)
+            return .init(file: name, caption: photo.caption, addedAt: photo.addedAt, order: photo.order, syncID: photo.syncID)
         }
         func photoRecords(_ list: [ReferencePhoto]) -> [BackupData.PhotoRecord] {
             list.sorted { ($0.order, $0.addedAt) < ($1.order, $1.addedAt) }.compactMap(record)
         }
         func trip(_ t: Trip) -> BackupData.TripRecord {
             .init(startDate: t.startDate, endDate: t.endDate, cityMiles: t.cityMiles, highwayMiles: t.highwayMiles,
-                  status: t.statusRaw, connectionName: t.connectionName, connectionID: t.connectionID)
+                  status: t.statusRaw, connectionName: t.connectionName, connectionID: t.connectionID,
+                  syncID: t.syncID, addedBy: t.addedBy)
         }
 
         let vehicles = ((try? context.fetch(FetchDescriptor<Vehicle>())) ?? [])
@@ -240,7 +255,7 @@ extension BackupSnapshot {
                 scheduleSource: v.scheduleSource,
                 fuel: (v.fuelEntries ?? []).sorted { ($0.date, $0.odometer) < ($1.date, $1.odometer) }.map {
                     .init(date: $0.date, odometer: $0.odometer, gallons: $0.gallons, totalCost: $0.totalCost,
-                          isFullTank: $0.isFullTank, station: $0.station, notes: $0.notes)
+                          isFullTank: $0.isFullTank, station: $0.station, notes: $0.notes, syncID: $0.syncID, addedBy: $0.addedBy)
                 },
                 services: (v.maintenanceEntries ?? [])
                     .sorted { ($0.date, $0.odometer, $0.serviceType) < ($1.date, $1.odometer, $1.serviceType) }
@@ -248,16 +263,17 @@ extension BackupSnapshot {
                         .init(date: e.date, odometer: e.odometer, serviceType: e.serviceType, cost: e.cost,
                               notes: e.notes, nextDueOdometer: e.nextDueOdometer, nextDueDate: e.nextDueDate,
                               parts: e.sortedParts.map {
-                                  .init(name: $0.name, cost: $0.cost, partNumber: $0.partNumber, quantity: $0.quantity)
+                                  .init(name: $0.name, cost: $0.cost, partNumber: $0.partNumber, quantity: $0.quantity,
+                                        syncID: $0.syncID)
                               },
-                              photos: photoRecords(e.photos ?? []))
+                              photos: photoRecords(e.photos ?? []), syncID: e.syncID, addedBy: e.addedBy)
                     },
                 trips: (v.trips ?? []).sorted { $0.startDate < $1.startDate }.map(trip),
                 schedule: v.sortedScheduleItems.map {
                     .init(name: $0.name, serviceType: $0.serviceType, everyMiles: $0.everyMiles,
                           everyMonths: $0.everyMonths, firstMiles: $0.firstMiles, firstMonths: $0.firstMonths,
                           customEveryMiles: $0.customEveryMiles, customEveryMonths: $0.customEveryMonths,
-                          note: $0.note, order: $0.order)
+                          note: $0.note, order: $0.order, syncID: $0.syncID)
                 },
                 tests: (v.testEntries ?? [])
                     .sorted { ($0.date, $0.odometer, $0.testType) < ($1.date, $1.odometer, $1.testType) }
@@ -265,14 +281,15 @@ extension BackupSnapshot {
                         .init(date: t.date, odometer: t.odometer, testType: t.testType, notes: t.notes,
                               readings: t.sortedReadings.map {
                                   .init(label: $0.label, value: $0.value, secondValue: $0.secondValue,
-                                        unit: $0.unit, text: $0.text, order: $0.order)
-                              })
+                                        unit: $0.unit, text: $0.text, order: $0.order, syncID: $0.syncID)
+                              }, syncID: t.syncID, addedBy: t.addedBy)
                     },
                 pages: (v.referencePages ?? []).sorted { ($0.kind, $0.name) < ($1.kind, $1.name) }.map { p in
                     .init(kind: p.kind, name: p.name, notes: p.notes, specMin: p.specMin, specMax: p.specMax,
                           specMaxSpread: p.specMaxSpread, remindEveryMonths: p.remindEveryMonths,
-                          remindEveryMiles: p.remindEveryMiles, photos: photoRecords(p.photos ?? []))
-                }
+                          remindEveryMiles: p.remindEveryMiles, photos: photoRecords(p.photos ?? []), syncID: p.syncID)
+                },
+                syncID: v.syncID
             )
         }
         let loose = ((try? context.fetch(FetchDescriptor<Trip>(predicate: #Predicate { $0.vehicle == nil }))) ?? [])
@@ -320,6 +337,7 @@ enum BackupRestore {
                 guard let bytes = photos[r.file] else { missing += 1; continue }
                 let photo = ReferencePhoto(data: bytes, caption: r.caption, order: r.order)
                 photo.addedAt = r.addedAt
+                photo.syncID = r.syncID
                 context.insert(photo)
                 attach(photo)
             }
@@ -329,6 +347,8 @@ enum BackupRestore {
                             highwayMiles: r.highwayMiles, connectionName: r.connectionName,
                             connectionID: r.connectionID)
             trip.statusRaw = r.status
+            trip.syncID = r.syncID
+            trip.addedBy = r.addedBy
             context.insert(trip)
             trip.vehicle = vehicle
         }
@@ -343,21 +363,27 @@ enum BackupRestore {
             v.connectionID = car.connectionID
             v.connectionName = car.connectionName
             v.scheduleSource = car.scheduleSource
+            v.syncID = car.syncID
             context.insert(v)
 
             for r in car.fuel {
                 let e = FuelEntry(date: r.date, odometer: r.odometer, gallons: r.gallons, totalCost: r.totalCost,
                                   isFullTank: r.isFullTank, station: r.station, notes: r.notes)
+                e.syncID = r.syncID
+                e.addedBy = r.addedBy
                 context.insert(e)
                 e.vehicle = v
             }
             for r in car.services {
                 let e = MaintenanceEntry(date: r.date, odometer: r.odometer, serviceType: r.serviceType, cost: r.cost,
                                          notes: r.notes, nextDueOdometer: r.nextDueOdometer, nextDueDate: r.nextDueDate)
+                e.syncID = r.syncID
+                e.addedBy = r.addedBy
                 context.insert(e)
                 e.vehicle = v
                 for p in r.parts {
                     let part = PartUsed(name: p.name, cost: p.cost, partNumber: p.partNumber, quantity: p.quantity)
+                    part.syncID = p.syncID
                     context.insert(part)
                     part.entry = e
                 }
@@ -372,16 +398,20 @@ enum BackupRestore {
                 item.firstMonths = r.firstMonths
                 item.customEveryMiles = r.customEveryMiles
                 item.customEveryMonths = r.customEveryMonths
+                item.syncID = r.syncID
                 context.insert(item)
                 item.vehicle = v
             }
             for r in car.tests {
                 let t = TestEntry(date: r.date, odometer: r.odometer, testType: r.testType, notes: r.notes)
+                t.syncID = r.syncID
+                t.addedBy = r.addedBy
                 context.insert(t)
                 t.vehicle = v
                 for reading in r.readings {
                     let x = TestReading(label: reading.label, value: reading.value, secondValue: reading.secondValue,
                                         unit: reading.unit, text: reading.text, order: reading.order)
+                    x.syncID = reading.syncID
                     context.insert(x)
                     x.entry = t
                 }
@@ -394,6 +424,7 @@ enum BackupRestore {
                 page.specMaxSpread = r.specMaxSpread
                 page.remindEveryMonths = r.remindEveryMonths
                 page.remindEveryMiles = r.remindEveryMiles
+                page.syncID = r.syncID
                 context.insert(page)
                 page.vehicle = v
                 insertPhotos(r.photos) { $0.page = page }

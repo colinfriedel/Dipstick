@@ -13,6 +13,10 @@ import SwiftData
 /// spec from the manual and an optional reminder interval.
 @Model
 final class ReferencePage {
+    /// Stays the same on every phone, for iCloud sync and sharing. Optional
+    /// so existing records get their own (see `SyncIDs.assign`); a default
+    /// would give them all the same one.
+    var syncID: String?
     /// "service" or "test".
     var kind: String = ReferencePage.serviceKind
     /// The service or test type it's for, as logged: "Brake fluid".
@@ -59,6 +63,10 @@ final class ReferencePage {
 /// (`externalStorage`) so pages with many photos stay quick to load.
 @Model
 final class ReferencePhoto {
+    /// Stays the same on every phone, for iCloud sync and sharing. Optional
+    /// so existing records get their own (see `SyncIDs.assign`); a default
+    /// would give them all the same one.
+    var syncID: String?
     @Attribute(.externalStorage) var data: Data?
     var caption: String?
     var addedAt: Date = Date()

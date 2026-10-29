@@ -11,6 +11,12 @@ import SwiftData
 /// types and their fields are in `TestTemplate`.
 @Model
 final class TestEntry {
+    /// Stays the same on every phone, for iCloud sync and sharing. Optional
+    /// so existing records get their own (see `SyncIDs.assign`); a default
+    /// would give them all the same one.
+    var syncID: String?
+    /// Who added it, on a shared car ("Mom"); nil for your own.
+    var addedBy: String?
     var date: Date = Date()
     var odometer: Int = 0
     var testType: String = ""
@@ -35,6 +41,10 @@ final class TestEntry {
 /// One measurement in a test: "Cylinder 1: 165 psi (wet 180)".
 @Model
 final class TestReading {
+    /// Stays the same on every phone, for iCloud sync and sharing. Optional
+    /// so existing records get their own (see `SyncIDs.assign`); a default
+    /// would give them all the same one.
+    var syncID: String?
     var label: String = ""
     var value: Double?
     /// A second reading for the same thing, e.g. wet compression.

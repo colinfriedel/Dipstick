@@ -10,6 +10,12 @@ import SwiftData
 /// vehicle's full set of entries, so editing an old entry can't leave it stale.
 @Model
 final class FuelEntry {
+    /// Stays the same on every phone, for iCloud sync and sharing. Optional
+    /// so existing records get their own (see `SyncIDs.assign`); a default
+    /// would give them all the same one.
+    var syncID: String?
+    /// Who added it, on a shared car ("Mom"); nil for your own.
+    var addedBy: String?
     var date: Date = Date()
     var odometer: Int = 0
     var gallons: Double = 0

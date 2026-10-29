@@ -10,6 +10,12 @@ import SwiftData
 /// work and old records survive changes to the built-in list.
 @Model
 final class MaintenanceEntry {
+    /// Stays the same on every phone, for iCloud sync and sharing. Optional
+    /// so existing records get their own (see `SyncIDs.assign`); a default
+    /// would give them all the same one.
+    var syncID: String?
+    /// Who added it, on a shared car ("Mom"); nil for your own.
+    var addedBy: String?
     var date: Date = Date()
     var odometer: Int = 0
     var serviceType: String = ""
@@ -64,6 +70,10 @@ final class MaintenanceEntry {
 /// strings so each part can carry its own cost.
 @Model
 final class PartUsed {
+    /// Stays the same on every phone, for iCloud sync and sharing. Optional
+    /// so existing records get their own (see `SyncIDs.assign`); a default
+    /// would give them all the same one.
+    var syncID: String?
     var name: String = ""
     /// Price of one; the line costs `cost × quantity`.
     var cost: Double = 0

@@ -25,11 +25,21 @@ struct DipstickApp: App {
             ReferencePage.self,
             ReferencePhoto.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        // In the app group (shared with the widgets), where SwiftData already
+        // put it once the group was added. iCloud sync is Dipstick's own
+        // (see Sync/), so SwiftData's built-in sync stays off even once the
+        // app has iCloud.
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            groupContainer: .identifier(CarDirectory.appGroup),
+            cloudKitDatabase: .none
+        )
 
         do {
             let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
             ServiceNotesMove.run(in: container.mainContext)
+            SyncIDs.assign(in: container.mainContext)
             #if DEBUG
             SampleData.seedIfRequested(into: container.mainContext)
             // Acts like the Control Center button, for testing in the simulator.

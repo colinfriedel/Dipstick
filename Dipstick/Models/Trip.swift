@@ -9,6 +9,12 @@ import SwiftData
 /// One recorded drive, summarized. Only totals are kept, never the route.
 @Model
 final class Trip {
+    /// Stays the same on every phone, for iCloud sync and sharing. Optional
+    /// so existing records get their own (see `SyncIDs.assign`); a default
+    /// would give them all the same one.
+    var syncID: String?
+    /// Who added it, on a shared car ("Mom"); nil for your own.
+    var addedBy: String?
     enum Status: String {
         /// Recorded but not yet confirmed as one of your cars.
         case unreviewed

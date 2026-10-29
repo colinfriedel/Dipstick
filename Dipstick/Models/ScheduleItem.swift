@@ -11,6 +11,10 @@ import SwiftData
 /// is measured from the latest logged service whose type is `serviceType`.
 @Model
 final class ScheduleItem {
+    /// Stays the same on every phone, for iCloud sync and sharing. Optional
+    /// so existing records get their own (see `SyncIDs.assign`); a default
+    /// would give them all the same one.
+    var syncID: String?
     /// As the manual words it: "Replace engine oil".
     var name: String = ""
     /// The logged service that counts as doing this: "Oil change".

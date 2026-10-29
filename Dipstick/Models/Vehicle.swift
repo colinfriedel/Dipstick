@@ -10,6 +10,10 @@ import SwiftData
 /// model stays compatible with CloudKit sync when it's turned on later.
 @Model
 final class Vehicle {
+    /// Stays the same on every phone, for iCloud sync and sharing. Optional
+    /// so existing records get their own (see `SyncIDs.assign`); a default
+    /// would give them all the same one.
+    var syncID: String?
     var name: String = ""
     var year: Int?
     var make: String?
