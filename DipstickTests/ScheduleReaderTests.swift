@@ -87,6 +87,23 @@ struct ScheduleReaderTests {
         return (boxes, ScheduleReader.InkMap(width: size, height: size, pixels: pixels))
     }
 
+    @Test func headersWithTheirUnitAndMonthsSpanningColumns() throws {
+        // "miles x 1,000  10 20 … 120" with months written once per two columns.
+        var boxes = [ScheduleReader.Box(text: "miles x 1,000", minX: 0.30, maxX: 0.40, minY: 0.10, maxY: 0.12)]
+        let xs = (0..<12).map { 0.45 + Double($0) * 0.045 }
+        boxes += zip(xs, stride(from: 10, through: 120, by: 10)).map {
+            .init(text: "\($1)", minX: $0 - 0.01, maxX: $0 + 0.01, minY: 0.10, maxY: 0.12)
+        }
+        boxes.append(.init(text: "months", minX: 0.30, maxX: 0.38, minY: 0.13, maxY: 0.15))
+        for (n, months) in [12, 24, 36, 48, 60, 72].enumerated() {
+            let center = (xs[n * 2] + xs[n * 2 + 1]) / 2
+            boxes.append(.init(text: "\(months)", minX: center - 0.01, maxX: center + 0.01, minY: 0.13, maxY: 0.15))
+        }
+        let (columns, _) = try #require(ScheduleReader.columns(ScheduleReader.tokens(boxes), pageText: "miles x 1,000\nmonths"))
+        #expect(columns.map(\.miles) == stride(from: 10_000, through: 120_000, by: 10_000).map { $0 })
+        #expect(columns.map(\.months) == [6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72])
+    }
+
     @Test func readsAGridFromInk() throws {
         let (boxes, ink) = gridPage(rows: [
             ("Replace engine oil and filter", Array(0..<8)),

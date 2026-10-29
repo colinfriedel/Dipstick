@@ -31,6 +31,7 @@ struct ReadSchedule {
                 }
                 parts.append("every \(item.everyMiles.map { "\($0) mi" } ?? "-")\(item.everyMonths.map { " \($0) mo" } ?? "")")
                 print("\(item.unsure ? "⚠ " : "  ")\(item.name)  [\(item.serviceType)]  " + parts.joined(separator: ", "))
+                if let note = item.note { print("      note: \(note)") }
             }
             print()
         }

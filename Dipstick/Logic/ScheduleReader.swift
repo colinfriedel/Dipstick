@@ -36,6 +36,9 @@ nonisolated enum ScheduleReader {
         var note: String?
         var unsure = false
         var include = true
+        /// The interval was written out in the table ("Every 30,000 miles"),
+        /// not read from marks, so notes under the table don't override it.
+        var fromStatedInterval = false
 
         var hasInterval: Bool { [everyMiles, everyMonths, firstMiles, firstMonths].contains { $0 != nil } }
     }
@@ -94,6 +97,22 @@ nonisolated enum ScheduleReader {
             }
             guard drawn else { return nil }
             self.init(width: w, height: h, pixels: pixels)
+        }
+
+        /// The longest share of a single pixel row that's dark, within a
+        /// region: near 1 when a ruled line crosses it.
+        func lineCoverage(minX: Double, maxX: Double, minY: Double, maxY: Double) -> Double {
+            let x0 = max(0, Int(minX * Double(width))), x1 = min(width, Int(maxX * Double(width)))
+            let y0 = max(0, Int(minY * Double(height))), y1 = min(height, Int((maxY * Double(height)).rounded(.up)))
+            guard x1 > x0, y1 > y0 else { return 0 }
+            var best = 0.0
+            for y in y0..<y1 {
+                let row = y * width
+                var dark = 0
+                for x in x0..<x1 where pixels[row + x] < 140 { dark += 1 }
+                best = max(best, Double(dark) / Double(x1 - x0))
+            }
+            return best
         }
 
         /// Share of dark pixels in a region given in page fractions from the
@@ -186,8 +205,17 @@ nonisolated enum ScheduleReader {
         struct Header { var y: Double; var xs: [Double]; var values: [Int]; var kind: String }
         var headers: [Header] = []
         for row in rows(tokens) {
-            let numbers = row.compactMap { t in headerNumber(t.text).map { (t.x, $0) } }
-            guard numbers.count >= 4, zip(numbers, numbers.dropFirst()).allSatisfy({ $0.1 < $1.1 }) else { continue }
+            let all = row.compactMap { t in headerNumber(t.text).map { (t.x, $0) } }
+            // The longest run of increasing numbers: a header can also
+            // hold its unit ("miles x 1,000  10  20  30").
+            var numbers: [(Double, Int)] = []
+            var run: [(Double, Int)] = []
+            for n in all {
+                if let last = run.last, n.1 <= last.1 { run = [] }
+                run.append(n)
+                if run.count > numbers.count { numbers = run }
+            }
+            guard numbers.count >= 4 else { continue }
             let line = row.map(\.text).joined(separator: " ").lowercased()
             let kind = line.contains("km") || line.contains("kilomet") ? "km"
                 : line.contains("month") || line.contains("mo.") ? "months"
@@ -213,90 +241,215 @@ nonisolated enum ScheduleReader {
             guard let row else { return nil }
             return zip(row.xs, row.values).first { abs($0.0 - x) < step * 0.45 }?.1
         }
-        let columns = base.xs.map { x in
+        var columns = base.xs.map { x in
             Column(x: x, miles: value(in: milesRow, near: x).map { Int((Double($0) * milesScale).rounded()) },
                    months: value(in: monthsRow, near: x).map { $0 / 10 })
+        }
+        // Months written once per several columns ("12" spanning the 10 and
+        // 20 columns): each value is at the end of its span, shared evenly.
+        if let monthsRow, milesRow != nil, monthsRow.values.count < columns.count,
+           columns.count % monthsRow.values.count == 0 {
+            let span = columns.count / monthsRow.values.count
+            for c in columns.indices {
+                let block = c / span, position = c % span
+                let start = block == 0 ? 0 : monthsRow.values[block - 1]
+                let end = monthsRow.values[block]
+                columns[c].months = (start + (end - start) * (position + 1) / span) / 10
+            }
         }
         return (columns, headers.map(\.y))
     }
 
-    /// Reads a grid table. Returns nil when the page isn't one. With the
-    /// page's `ink`, a cell counts as marked when it has ink in it;
-    /// without, only marks the text recognition read (•, ✓, I, R…).
-    static func readGrid(_ boxes: [Box], ink: InkMap? = nil, known: [String] = []) -> [Item]? {
+    /// Reads a grid table. Returns nil when the page isn't one.
+    ///
+    /// Each row's label is the text left of the columns. A row is then:
+    /// - an interval written across the columns ("Every 30,000 miles"),
+    /// - a note across the columns ("Check at each fuel stop": no interval),
+    /// - or marks in the columns where it's due. With the page's `ink`, a
+    ///   cell counts as marked when it has ink in it, and rows that share
+    ///   one merged cell (no ruled line between them) share its marks.
+    ///   Without, only marks the text recognition read (•, ✓, I, R…).
+    /// Indented lines are details of the row above; short codes like "A/T"
+    /// name a variant of the row above.
+    static func readGrid(_ allBoxes: [Box], ink: InkMap? = nil, known: [String] = []) -> [Item]? {
+        // Sideways text (a page title running up the margin) isn't a label.
+        let boxes = allBoxes.filter { $0.height < ($0.maxX - $0.minX) * 3 || $0.text.count <= 2 }
         let pageText = boxes.map(\.text).joined(separator: "\n")
         let all = tokens(boxes)
         guard let (columns, headerYs) = columns(all, pageText: pageText), columns.count >= 4 else { return nil }
         let xs = columns.map(\.x)
         let step = zip(xs, xs.dropFirst()).map { $1 - $0 }.sorted()[(xs.count - 1) / 2]
-        let tableTop = headerYs.min()!
+        let tableTop = headerYs.max()!
         let gridLeft = xs.first! - step * 0.55
+        let gridRight = xs.last! + step * 0.55
+        func isHeaderLine(_ y: Double, _ height: Double) -> Bool { headerYs.contains { abs($0 - y) < height * 0.6 } }
 
-        // Labels: text left of the first column, below the header.
-        let labelBoxes = boxes.filter { box in
-            box.maxX < gridLeft && box.midY > tableTop
-                && !headerYs.contains { abs($0 - box.midY) < box.height * 0.6 }
+        // Label rows, with how far each is indented.
+        struct Row {
+            var text: String
+            var y: Double
+            var height: Double
+            var minX: Double
+            var gridText: [String] = []
+            var marks: Set<Int> = []
         }
-        var labels: [(text: String, y: Double, height: Double)] = []
-        for box in labelBoxes.sorted(by: { $0.midY < $1.midY }) {
-            if let i = labels.indices.last, abs(labels[i].y - box.midY) < min(labels[i].height, box.height) * 0.6 {
-                labels[i].text += " " + box.text
+        var rows: [Row] = []
+        for box in boxes.filter({ $0.maxX < gridLeft && $0.midY > tableTop && !isHeaderLine($0.midY, $0.height) })
+            .sorted(by: { $0.midY < $1.midY }) {
+            if let i = rows.indices.last, abs(rows[i].y - box.midY) < min(rows[i].height, box.height) * 0.6 {
+                // Same line: left to right.
+                if box.minX < rows[i].minX { rows[i].text = box.text + " " + rows[i].text; rows[i].minX = box.minX }
+                else { rows[i].text += " " + box.text }
             } else {
-                labels.append((box.text, box.midY, box.height))
+                rows.append(Row(text: box.text, y: box.midY, height: box.height, minX: box.minX))
+            }
+        }
+        guard rows.count >= 2 else { return nil }
+        func row(near y: Double, height: Double) -> Int? {
+            rows.indices.min { abs(rows[$0].y - y) < abs(rows[$1].y - y) }
+                .flatMap { abs(rows[$0].y - y) < max(rows[$0].height, height) * 0.6 ? $0 : nil }
+        }
+
+        // Text written across the columns goes with its row, or (a second
+        // line of it) with the row above. A line that starts in the label
+        // column and runs into the grid is a heading.
+        for box in boxes where box.midY > tableTop && box.minX >= gridLeft - step * 0.2 && box.minX < gridRight
+            && box.text.filter(\.isLetter).count >= 3 && !isHeaderLine(box.midY, box.height) {
+            if let r = row(near: box.midY, height: box.height) {
+                rows[r].gridText.append(box.text)
+            } else if let above = rows.indices.last(where: { rows[$0].y < box.midY }), !rows[above].gridText.isEmpty,
+                      box.midY - rows[above].y < box.height * 2.6 {
+                rows[above].gridText.append(box.text)
             }
         }
 
-        // Marks: ink in a row's cell under a column.
-        var marksByLabel: [Int: Set<Int>] = [:]
+        // Marks: ink in a row's cell under a column (rows without text across).
         if let ink {
-            for (i, label) in labels.enumerated() {
-                let half = label.height * 0.3
-                for (c, x) in xs.enumerated()
-                where ink.darkness(minX: x - step * 0.3, maxX: x + step * 0.3,
-                                   minY: label.y - half, maxY: label.y + half) > 0.012 {
-                    marksByLabel[i, default: []].insert(c)
+            for r in rows.indices where rows[r].gridText.isEmpty {
+                let half = rows[r].height * 0.3
+                for (c, x) in xs.enumerated() {
+                    let cell = (minX: x - step * 0.3, maxX: x + step * 0.3, minY: rows[r].y - half, maxY: rows[r].y + half)
+                    // Ink across the whole cell is a ruled line, not a mark.
+                    guard ink.darkness(minX: cell.minX, maxX: cell.maxX, minY: cell.minY, maxY: cell.maxY) > 0.012,
+                          ink.lineCoverage(minX: cell.minX, maxX: cell.maxX, minY: cell.minY, maxY: cell.maxY) < 0.7
+                    else { continue }
+                    rows[r].marks.insert(c)
                 }
             }
         }
         // And marks the text recognition read.
-        for token in all where token.y > tableTop + 0.003 && token.text.count <= 3 && !headerYs.contains(where: { abs($0 - token.y) < token.height * 0.6 }) {
+        for token in all where token.y > tableTop + 0.003 && token.text.count <= 3
+            && !token.text.contains(where: \.isLetter) && !isHeaderLine(token.y, token.height) {
             guard let col = xs.firstIndex(where: { abs($0 - token.x) < step * 0.45 }),
-                  let label = labels.indices.min(by: { abs(labels[$0].y - token.y) < abs(labels[$1].y - token.y) }),
-                  abs(labels[label].y - token.y) < labels[label].height * 1.1 else { continue }
-            marksByLabel[label, default: []].insert(col)
-        }
-        guard marksByLabel.count >= 2 else { return nil }
-
-        // A label line with no marks that continues the line above (starts
-        // in lowercase, or the line above ends mid-phrase) is a wrapped name;
-        // others are headings and notes.
-        var names: [Int: String] = Dictionary(uniqueKeysWithValues: marksByLabel.keys.map { ($0, labels[$0].text) })
-        for i in labels.indices where marksByLabel[i] == nil && i > 0 && names[i - 1] != nil {
-            let above = names[i - 1]!.trimmingCharacters(in: .whitespaces).lowercased()
-            let continues = labels[i].text.first?.isLowercase == true
-                || [",", "&", "-", "/"].contains(where: above.hasSuffix)
-                || [" and", " or", " the", " of"].contains(where: above.hasSuffix)
-            guard continues, abs(labels[i - 1].y - labels[i].y) < labels[i].height * 1.8 else { continue }
-            names[i - 1] = names[i - 1]! + " " + labels[i].text
+                  let r = row(near: token.y, height: token.height), rows[r].gridText.isEmpty else { continue }
+            rows[r].marks.insert(col)
         }
 
-        return marksByLabel.keys.sorted().compactMap { label -> Item? in
-            let cols = marksByLabel[label]!.sorted()
-            var item = Item(name: cleanName(names[label]!), serviceType: "")
-            guard !item.name.isEmpty else { return nil }
-            item.serviceType = RecordImport.serviceName(item.name, known: known)
-            let miles = interval(cols.compactMap { columns[$0].miles })
-            let months = interval(cols.compactMap { columns[$0].months })
-            (item.everyMiles, item.firstMiles) = (miles.every, miles.first)
-            (item.everyMonths, item.firstMonths) = (months.every, months.first)
-            item.unsure = miles.unsure || months.unsure
-            // A note in the name ("every 3 years") overrides the grid.
-            if let stated = listInterval(names[label]!) {
-                item.everyMonths = stated.everyMonths ?? item.everyMonths
-                item.everyMiles = stated.everyMiles ?? item.everyMiles
+        // Details: indented lines belong to the row above (not services).
+        // Where most labels start (the page number or a footnote can stick out further).
+        let leftEdge = rows.map(\.minX).sorted()[rows.count / 2]
+        let indent = step * 0.25
+        var details: [Int: [String]] = [:]
+        var isDetail = Set<Int>()
+        for r in rows.indices where r > 0 && rows[r].minX > leftEdge + indent && rows[r].gridText.isEmpty
+            && rows[r].text.filter(\.isLetter).count > 3 {
+            let owner = (0..<r).last { !isDetail.contains($0) }!
+            // Footnote marks (*, #) go; the wording stays as printed.
+            let detail = rows[r].text.replacingOccurrences(of: "*", with: "").replacingOccurrences(of: "#", with: "")
+                .trimmingCharacters(in: .whitespaces.union(CharacterSet(charactersIn: "•-:")))
+            details[owner, default: []].append(detail)
+            isDetail.insert(r)
+        }
+
+        // Rows in one merged cell (no ruled line between them) share its marks.
+        if let ink {
+            var group: [Int] = []
+            // Rows with marks of their own keep them; rows without borrow
+            // the cell's marks when the cell has just one set.
+            func closeGroup() {
+                let sets = Set(group.map { rows[$0].marks }.filter { !$0.isEmpty })
+                if sets.count == 1, let marks = sets.first {
+                    for r in group where rows[r].marks.isEmpty { rows[r].marks = marks }
+                }
+                group = []
             }
-            return item
+            for r in rows.indices where rows[r].gridText.isEmpty {
+                if let last = group.last {
+                    // Look for a ruled line around the midpoint between the two rows.
+                    let middle = (rows[last].y + rows[r].y) / 2
+                    let reach = min(rows[last].height, rows[r].height) * 0.3
+                    let (gapTop, gapBottom) = (middle - reach, middle + reach)
+                    let ruled = ink.lineCoverage(minX: xs.first! - step * 0.4, maxX: xs.last! + step * 0.4,
+                                                                       minY: gapTop, maxY: gapBottom) > 0.6
+                    if ruled || r != last + 1 { closeGroup() }
+                }
+                group.append(r)
+            }
+            closeGroup()
         }
+
+        // Variants: a short code ("A/T", "M/T") names a variant of the row above.
+        var names = rows.map(\.text)
+        for r in rows.indices {
+            let code = rows[r].text.trimmingCharacters(in: .whitespaces)
+            if code.count <= 4, code.filter(\.isLetter).count <= 3, r > 0 {
+                let owner = (0..<r).last { !isDetail.contains($0) && rows[$0].text.count > 4 }!
+                let base = rows[owner].text.split(separator: " ").map(String.init).filter { $0.count > 3 || $0.contains(where: \.isLowercase) }
+                    .joined(separator: " ")
+                names[r] = "\(cleanName(base)) (\(code.uppercased().replacingOccurrences(of: "AT", with: "A/T")))"
+            } else if let codeRange = rows[r].text.range(of: #"\s[A-Z]/?[A-Z]$"#, options: .regularExpression) {
+                // "Replace transmission fluid  M/T" on one line.
+                let code = rows[r].text[codeRange].trimmingCharacters(in: .whitespaces)
+                names[r] = "\(cleanName(String(rows[r].text[..<codeRange.lowerBound]))) (\(code))"
+            }
+        }
+
+        var items: [Item] = []
+        var markedRows = 0
+        for r in rows.indices where !isDetail.contains(r) {
+            var item = Item(name: names[r].hasSuffix(")") ? names[r] : cleanName(names[r]), serviceType: "")
+            guard item.name.filter(\.isLetter).count >= 3 else { continue }
+            // A long aside in parentheses is a note, not part of the name.
+            var aside: String?
+            if let open = item.name.firstIndex(of: "("), let close = item.name.lastIndex(of: ")"), open < close,
+               item.name.distance(from: open, to: close) > 12 {
+                aside = String(item.name[item.name.index(after: open)..<close])
+                item.name = cleanName(String(item.name[..<open]))
+            }
+            item.serviceType = RecordImport.serviceName(item.name, known: known)
+            let detailText = [aside, details[r].map { $0.joined(separator: ", ") }].compactMap { $0 }
+                .joined(separator: ". ").nilIfBlank
+            let across = rows[r].gridText.joined(separator: " ")
+            if !across.isEmpty {
+                guard let stated = listInterval(across) else { continue }   // a note, like "at each fuel stop"
+                (item.everyMiles, item.everyMonths, item.firstMiles, item.firstMonths) =
+                    (stated.everyMiles, stated.everyMonths, stated.firstMiles, stated.firstMonths)
+                item.fromStatedInterval = true
+                let lower = across.lowercased()
+                if lower.contains("otherwise") || lower.contains("independent") || lower.contains("only if") {
+                    item.note = across
+                }
+            } else if !rows[r].marks.isEmpty {
+                markedRows += 1
+                let cols = rows[r].marks.sorted()
+                let miles = interval(cols.compactMap { columns[$0].miles })
+                let months = interval(cols.compactMap { columns[$0].months })
+                (item.everyMiles, item.firstMiles) = (miles.every, miles.first)
+                (item.everyMonths, item.firstMonths) = (months.every, months.first)
+                item.unsure = miles.unsure || months.unsure
+                // A note in the name ("every 3 years") overrides the grid.
+                if let stated = listInterval(names[r]) {
+                    item.everyMonths = stated.everyMonths ?? item.everyMonths
+                    item.everyMiles = stated.everyMiles ?? item.everyMiles
+                }
+            } else {
+                continue
+            }
+            item.note = [item.note, detailText].compactMap { $0 }.joined(separator: ". ").nilIfBlank
+            items.append(item)
+        }
+        guard markedRows >= 2 || items.count >= 3 else { return nil }
+        return items
     }
 
     /// The interval from the columns marked: the usual spacing of the
@@ -372,7 +525,9 @@ nonisolated enum ScheduleReader {
     static func withNotes(_ grid: [Item], from text: String, known: [String]) -> [Item] {
         var items = grid
         for note in readList(text, known: known) {
-            guard let i = items.firstIndex(where: { $0.serviceType.caseInsensitiveCompare(note.serviceType) == .orderedSame }) else { continue }
+            guard let i = items.firstIndex(where: {
+                !$0.fromStatedInterval && $0.serviceType.caseInsensitiveCompare(note.serviceType) == .orderedSame
+            }) else { continue }
             items[i].everyMiles = note.everyMiles
             items[i].everyMonths = note.everyMonths
             items[i].firstMiles = note.firstMiles
@@ -525,3 +680,7 @@ private enum ModelScheduleReader {
     }
 }
 #endif
+
+nonisolated private extension String {
+    var nilIfBlank: String? { trimmingCharacters(in: .whitespaces).isEmpty ? nil : self }
+}
