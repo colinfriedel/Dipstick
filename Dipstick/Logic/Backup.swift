@@ -304,7 +304,10 @@ enum BackupRestore {
     /// - Returns: how many photos were missing.
     @discardableResult
     static func apply(_ data: BackupData, photos: [String: Data], into context: ModelContext) -> Int {
-        for vehicle in (try? context.fetch(FetchDescriptor<Vehicle>())) ?? [] { context.delete(vehicle) }
+        for vehicle in (try? context.fetch(FetchDescriptor<Vehicle>())) ?? [] {
+            TripRecorder.shared.forget(vehicle)
+            context.delete(vehicle)
+        }
         for trip in (try? context.fetch(FetchDescriptor<Trip>())) ?? [] where trip.vehicle == nil { context.delete(trip) }
         // Anything left without an owner (normally nothing).
         for photo in (try? context.fetch(FetchDescriptor<ReferencePhoto>())) ?? [] where photo.entry == nil && photo.page == nil {

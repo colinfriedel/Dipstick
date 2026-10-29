@@ -172,6 +172,7 @@ struct VehicleDetailView: View {
         }
         .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in
             dismiss()
+            TripRecorder.shared.forget(vehicle)
             modelContext.delete(vehicle)
             modelContext.saveNow()
         }

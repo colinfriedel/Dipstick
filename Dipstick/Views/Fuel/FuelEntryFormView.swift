@@ -244,6 +244,8 @@ struct FuelEntryFormView: View {
             StatusLine(status: .overdue, text: "Already logged a fill-up at \(Units.miles(duplicate.odometer)) on \(duplicate.date.formatted(date: .abbreviated, time: .omitted))")
         } else if let higher = higherEntry {
             StatusLine(status: .dueSoon, text: "Lower than your \(higher.date.formatted(date: .abbreviated, time: .omitted)) fill-up at \(Units.miles(higher.odometer))")
+        } else if let jump = Units.odometerJump(parsedOdometer, from: vehicle.currentOdometer, limit: 2_000) {
+            StatusLine(status: .dueSoon, text: "\(Units.miles(jump)) more than \(vehicle.name)'s last reading. Check for a typo")
         }
     }
 

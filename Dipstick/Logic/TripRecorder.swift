@@ -235,10 +235,19 @@ final class TripRecorder {
         }
         guard final.totalMiles >= 0.1 else { return nil }
 
+        // Never save to a car deleted since the drive began.
+        let car = vehicle.flatMap { $0.modelContext == nil || $0.isDeleted ? nil : $0 }
         return Trip.save(
             start: startDate, end: trimAfter ?? Date(), split: final,
-            vehicle: vehicle, connection: connection, in: context
+            vehicle: car, connection: connection, in: context
         )
+    }
+
+    /// A car is about to be deleted: a drive recording for it carries on as
+    /// a drive to sort, instead of saving to the deleted car.
+    func forget(_ vehicle: Vehicle) {
+        guard self.vehicle?.persistentModelID == vehicle.persistentModelID else { return }
+        self.vehicle = nil
     }
 
     func discard() {

@@ -8,6 +8,14 @@ import Foundation
 /// The single place that turns numbers into display strings, so switching to
 /// km / liters later means changing this file only.
 nonisolated enum Units {
+    /// How far `reading` is past the car's last reading, when that's more
+    /// than `limit` (likely a typo, like an extra digit). nil otherwise, or
+    /// before the car has a reading.
+    static func odometerJump(_ reading: Int?, from current: Int, limit: Int) -> Int? {
+        guard let reading, current > 0, reading - current > limit else { return nil }
+        return reading - current
+    }
+
     static func miles(_ value: Int) -> String {
         "\(value.formatted()) mi"
     }

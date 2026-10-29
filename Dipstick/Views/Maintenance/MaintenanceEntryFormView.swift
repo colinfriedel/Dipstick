@@ -237,6 +237,9 @@ struct MaintenanceEntryFormView: View {
 
                 OdometerField(text: $odometer, focus: $odometerFocused, size: 24)
                     .padding(.top, 4)
+                if let jump = Units.odometerJump(parsedOdometer, from: vehicle.currentOdometer, limit: 5_000) {
+                    StatusLine(status: .dueSoon, text: "\(Units.miles(jump)) more than \(vehicle.name)'s last reading. Check for a typo")
+                }
 
                 TileRow {
                     dateTile

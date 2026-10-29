@@ -126,7 +126,7 @@ struct VehicleListView: View {
             }
             .onChange(of: quickActions.fillUpRequested, initial: true) { handleFillUpRequest() }
             // Keep the Control Center's list of cars current.
-            .onChange(of: vehicles.map { "\($0.name)|\($0.mpgSummary.latest ?? 0)" }, initial: true) {
+            .onChange(of: vehicles.map { "\($0.directoryID)|\($0.name)|\($0.mpgSummary.latest ?? 0)" }, initial: true) {
                 CarDirectory.update(from: vehicles)
             }
             .fullScreenCover(item: $vehicleToFuel) { vehicle in
@@ -139,6 +139,7 @@ struct VehicleListView: View {
                 UnassignedTripsView()
             }
             .deleteVehicleConfirmation(for: $vehicleToDelete) { vehicle in
+                TripRecorder.shared.forget(vehicle)
                 modelContext.delete(vehicle)
                 modelContext.saveNow()
             }

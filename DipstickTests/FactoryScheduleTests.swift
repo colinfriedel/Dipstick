@@ -195,3 +195,87 @@ struct StandardScheduleTests {
         #expect(!types(2024).contains("Timing belt") && !types(2024).contains("Fuel filter"))
     }
 }
+
+@MainActor
+struct ScheduleBugFixTests {
+    private func context() throws -> ModelContext {
+        ModelContext(try ModelContainer(for: Vehicle.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+    }
+    private func date(_ y: Int, _ m: Int, _ d: Int) -> Date {
+        Calendar.current.date(from: DateComponents(year: y, month: m, day: d))!
+    }
+
+    @Test func homeScreenFollowsTheIntervalYouChanged() throws {
+        let context = try context()
+        let car = Vehicle(name: "Acura", year: 2003, currentOdometer: 59_000)
+        context.insert(car)
+        // Logged with a 3,000 mi interval saved on the entry.
+        let oil = MaintenanceEntry(date: date(2026, 9, 1), odometer: 55_000, serviceType: "Oil change",
+                                   nextDueOdometer: 58_000, nextDueDate: nil)
+        context.insert(oil)
+        oil.vehicle = car
+        // The schedule now says 5,000 mi.
+        let item = ScheduleItem(name: "Replace engine oil", serviceType: "Oil change",
+                                rule: .init(everyMiles: 3_000))
+        item.customEveryMiles = 5_000
+        context.insert(item)
+        item.vehicle = car
+
+        let due = try #require(car.maintenanceDueItems(today: date(2026, 10, 29)).first { $0.serviceType == "Oil change" })
+        #expect(due.due.odometer == 60_000)
+        #expect(due.milesLeft == 1_000)
+        #expect(due.status != .overdue)
+    }
+
+    @Test func neverLoggedCountsYearsFromTheModelYear() throws {
+        let context = try context()
+        let car = Vehicle(name: "Acura", year: 2003, currentOdometer: 57_000)
+        context.insert(car)
+        let coolant = ScheduleItem(name: "Replace engine coolant", serviceType: "Coolant",
+                                   rule: .init(everyMiles: 60_000, everyMonths: 60, firstMiles: 120_000, firstMonths: 120))
+        context.insert(coolant)
+        coolant.vehicle = car
+
+        let progress = try #require(car.scheduleProgress(for: coolant, today: date(2026, 10, 29)))
+        #expect(progress.due.odometer == 120_000)
+        #expect(progress.due.date == date(2013, 1, 1))
+        #expect(progress.status == .overdue)
+        #expect(progress.needsRecord)
+
+        // Without a year, only miles count, as before.
+        car.year = nil
+        let milesOnly = try #require(car.scheduleProgress(for: coolant, today: date(2026, 10, 29)))
+        #expect(milesOnly.due.date == nil)
+        #expect(milesOnly.status == .ok)
+    }
+}
+
+struct OdometerTypoTests {
+    @Test func flagsBigJumpsOnly() {
+        #expect(Units.odometerJump(520_000, from: 52_000, limit: 2_000) == 468_000)
+        #expect(Units.odometerJump(52_400, from: 52_000, limit: 2_000) == nil)
+        #expect(Units.odometerJump(51_000, from: 52_000, limit: 2_000) == nil)
+        // A new car with no reading yet isn't a typo.
+        #expect(Units.odometerJump(120_000, from: 0, limit: 2_000) == nil)
+        #expect(Units.odometerJump(nil, from: 52_000, limit: 2_000) == nil)
+    }
+}
+
+@MainActor
+struct DeletedCarRecordingTests {
+    @Test func aDeletedCarsDriveIsKeptToSort() throws {
+        let context = ModelContext(try ModelContainer(for: Vehicle.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+        let car = Vehicle(name: "Old car")
+        context.insert(car)
+        try context.save()
+        context.delete(car)
+        try context.save()
+        // What stop() does with a car deleted mid-drive.
+        let kept = Optional(car).flatMap { $0.modelContext == nil || $0.isDeleted ? nil : $0 }
+        #expect(kept == nil)
+        let trip = Trip.save(start: .now.addingTimeInterval(-900), end: .now,
+                             split: .init(cityMiles: 3, highwayMiles: 2), vehicle: kept, connection: nil, in: context)
+        #expect(trip.vehicle == nil)
+        #expect(trip.status == .unreviewed)
+    }
+}
