@@ -30,6 +30,7 @@ nonisolated struct BackupData: Codable, Equatable {
         var knownConnections: String
         var connectionID: String?
         var connectionName: String?
+        var scheduleSource: String?
         var fuel: [FuelRecord] = []
         var services: [ServiceRecord] = []
         var trips: [TripRecord] = []
@@ -235,6 +236,7 @@ extension BackupSnapshot {
                 name: v.name, year: v.year, make: v.make, model: v.model, vin: v.vin,
                 currentOdometer: v.currentOdometer, colorHex: v.colorHex, colorName: v.colorName,
                 knownConnections: v.knownConnections, connectionID: v.connectionID, connectionName: v.connectionName,
+                scheduleSource: v.scheduleSource,
                 fuel: (v.fuelEntries ?? []).sorted { ($0.date, $0.odometer) < ($1.date, $1.odometer) }.map {
                     .init(date: $0.date, odometer: $0.odometer, gallons: $0.gallons, totalCost: $0.totalCost,
                           isFullTank: $0.isFullTank, station: $0.station, notes: $0.notes)
@@ -335,6 +337,7 @@ enum BackupRestore {
             v.knownConnections = car.knownConnections
             v.connectionID = car.connectionID
             v.connectionName = car.connectionName
+            v.scheduleSource = car.scheduleSource
             context.insert(v)
 
             for r in car.fuel {

@@ -18,6 +18,7 @@ struct FactoryScheduleView: View {
     @State private var openItem: ScheduleItem?
     @State private var isAdding = false
     @State private var isConfirmingClear = false
+    @State private var isReadingManual = false
 
     private struct Row: Identifiable {
         let item: ScheduleItem
@@ -45,6 +46,7 @@ struct FactoryScheduleView: View {
                 if rows.isEmpty {
                     emptyState
                 } else {
+                    if vehicle.hasStandardSchedule { standardBanner }
                     if !charted.isEmpty {
                         SectionTitle("By urgency") {
                             Text("Since last logged")
@@ -95,6 +97,9 @@ struct FactoryScheduleView: View {
         } message: {
             Text("Logged services aren't affected.")
         }
+        .fullScreenCover(isPresented: $isReadingManual) {
+            ScheduleImportView(vehicle: vehicle)
+        }
     }
 
     private func itemButton<Label: View>(_ item: ScheduleItem, @ViewBuilder label: () -> Label) -> some View {
@@ -130,6 +135,8 @@ struct FactoryScheduleView: View {
             .accessibilityLabel("Add schedule item")
 
             Menu {
+                Button("Read from Owner's Manual…", systemImage: "doc.text.viewfinder") { isReadingManual = true }
+                Button("Use Standard Schedule", systemImage: "arrow.counterclockwise") { load(standardPreset) }
                 presetButtons
                 if !(vehicle.scheduleItems ?? []).isEmpty {
                     Divider()
@@ -168,16 +175,58 @@ struct FactoryScheduleView: View {
         }
     }
 
+    /// On the standard schedule: say what it is, and that it can be changed.
+    private var standardBanner: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle")
+                    .foregroundStyle(Theme.muted)
+                Text("Standard schedule")
+                    .font(.dipstick(14, .semibold, relativeTo: .body))
+                    .foregroundStyle(Theme.text)
+            }
+            Text("Routine intervals for \(FactorySchedule.Era(year: vehicle.year).label)\(vehicle.year == nil ? " (add the year in Edit to match yours)" : ""). If your owner's manual, dealer or mechanic gives different ones, tap an item, then Edit, to change it, or remove any that don't apply.")
+                .font(.dipstick(13, relativeTo: .footnote))
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { isReadingManual = true } label: {
+                Label("Have your car's schedule? Read it from the manual", systemImage: "doc.text.viewfinder")
+                    .font(.dipstick(13, .semibold, relativeTo: .footnote))
+                    .foregroundStyle(Theme.accentText)
+                    .multilineTextAlignment(.leading)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .panel(radius: Theme.Radius.field)
+    }
+
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Add the services from your owner's manual to see how close each one is.")
+            Text("Start from routine intervals that suit most cars, then change any to match your car's schedule.")
                 .font(.dipstick(14, relativeTo: .body))
                 .foregroundStyle(Theme.muted)
+            Button { load(standardPreset) } label: {
+                Label("Use the standard schedule", systemImage: "square.and.arrow.down")
+            }
+            .buttonStyle(BigActionButtonStyle(height: 56))
+            Button { isReadingManual = true } label: {
+                Label("Read from owner's manual", systemImage: "doc.text.viewfinder")
+                    .font(.dipstick(14, .semibold, relativeTo: .body))
+                    .foregroundStyle(Theme.accentText)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.plain)
             ForEach(FactorySchedule.presets) { preset in
                 Button { load(preset) } label: {
                     Label("Load \(preset.name)", systemImage: "square.and.arrow.down")
+                        .font(.dipstick(14, .semibold, relativeTo: .body))
+                        .foregroundStyle(Theme.accentText)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(BigActionButtonStyle(height: 56))
+                .buttonStyle(.plain)
             }
             Button { isAdding = true } label: {
                 Label("Add item", systemImage: "plus")
@@ -190,8 +239,18 @@ struct FactoryScheduleView: View {
         .padding(.top, 8)
     }
 
+    /// A preset replaces the standard schedule (or an empty one), and is
+    /// added after the car's own items otherwise.
+    /// The standard schedule for this car's model year.
+    private var standardPreset: FactorySchedule.Preset { FactorySchedule.standard(forYear: vehicle.year) }
+
     private func load(_ preset: FactorySchedule.Preset) {
-        vehicle.loadSchedule(preset, into: modelContext)
+        let source = preset.id == standardPreset.id ? FactorySchedule.standardSource : preset.name
+        if vehicle.hasStandardSchedule || (vehicle.scheduleItems ?? []).isEmpty {
+            vehicle.replaceSchedule(with: preset.items, source: source, in: modelContext)
+        } else {
+            vehicle.loadSchedule(preset, into: modelContext)
+        }
         modelContext.saveNow()
     }
 }

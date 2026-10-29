@@ -146,3 +146,52 @@ struct FactoryScheduleTests {
         #expect(try context.fetchCount(FetchDescriptor<ScheduleItem>()) == 0)
     }
 }
+
+@MainActor
+struct StandardScheduleTests {
+    @Test(arguments: FactorySchedule.Era.allCases)
+    func everyStandardItemIsTrackedOrANote(era: FactorySchedule.Era) {
+        let items = FactorySchedule.standard(for: era).items
+        #expect(items.count >= 12)
+        // Only the monthly check has no interval; it's a reminder.
+        #expect(items.filter { !$0.rule.isTracked }.map(\.serviceType) == ["Fluids"])
+        #expect(Set(items.map(\.name)).count == items.count)
+        // A brand-new car isn't overdue for anything.
+        for item in items where item.rule.isTracked {
+            let progress = FactorySchedule.progress(for: item.rule, lastDone: nil, currentOdometer: 0)
+            #expect(progress?.status == .ok, "\(item.name)")
+        }
+    }
+
+    @Test func newCarsStartOnTheStandardScheduleAndAPresetReplacesIt() throws {
+        let context = ModelContext(try ModelContainer(for: Vehicle.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true)))
+        let car = Vehicle(name: "Civic")
+        context.insert(car)
+        car.loadSchedule(FactorySchedule.standard(forYear: 2019), into: context)
+        car.scheduleSource = FactorySchedule.standardSource
+        #expect(car.hasStandardSchedule)
+
+        car.replaceSchedule(with: FactorySchedule.acuraRSX.items, source: FactorySchedule.acuraRSX.name, in: context)
+        context.saveNow()
+        #expect(!car.hasStandardSchedule)
+        #expect(car.sortedScheduleItems.count == FactorySchedule.acuraRSX.items.count)
+        #expect(try context.fetchCount(FetchDescriptor<ScheduleItem>()) == FactorySchedule.acuraRSX.items.count)
+    }
+
+    @Test func theYearPicksTheSchedule() {
+        #expect(FactorySchedule.Era(year: 2003) == .before2008)
+        #expect(FactorySchedule.Era(year: 2008) == .from2008)
+        #expect(FactorySchedule.Era(year: 2017) == .from2008)
+        #expect(FactorySchedule.Era(year: 2018) == .from2018)
+        #expect(FactorySchedule.Era(year: nil) == .from2008)
+        func oil(_ year: Int?) -> FactorySchedule.Rule? {
+            FactorySchedule.standard(forYear: year).items.first { $0.serviceType == "Oil change" }?.rule
+        }
+        #expect(oil(2003)?.everyMiles == 5_000)
+        #expect(oil(2012)?.everyMiles == 7_500)
+        #expect(oil(2024)?.everyMiles == 10_000)
+        let types = { (year: Int) in Set(FactorySchedule.standard(forYear: year).items.map(\.serviceType)) }
+        #expect(types(2003).contains("Fuel filter") && types(2003).contains("Timing belt"))
+        #expect(!types(2024).contains("Timing belt") && !types(2024).contains("Fuel filter"))
+    }
+}

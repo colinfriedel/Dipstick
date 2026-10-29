@@ -36,15 +36,21 @@ nonisolated enum ReceiptReader {
         return Result(receipt: parsed, lines: lines, usedModel: false)
     }
 
-    static func recognizedLines(_ image: CGImage, orientation: CGImagePropertyOrientation) -> [String] {
+    /// Every piece of text on the image and where it is (Vision's
+    /// normalized coordinates, origin bottom left).
+    static func recognizedBoxes(_ image: CGImage, orientation: CGImagePropertyOrientation) -> [ReceiptParser.TextBox] {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         try? VNImageRequestHandler(cgImage: image, orientation: orientation).perform([request])
-        let boxes = (request.results ?? []).compactMap { observation -> ReceiptParser.TextBox? in
+        return (request.results ?? []).compactMap { observation -> ReceiptParser.TextBox? in
             guard let text = observation.topCandidates(1).first?.string else { return nil }
             return .init(text: text, topLeft: observation.topLeft, topRight: observation.topRight,
                          bottomLeft: observation.bottomLeft, bottomRight: observation.bottomRight)
         }
+    }
+
+    static func recognizedLines(_ image: CGImage, orientation: CGImagePropertyOrientation) -> [String] {
+        let boxes = recognizedBoxes(image, orientation: orientation)
         let sideways = [.left, .right, .leftMirrored, .rightMirrored].contains(orientation)
         let (w, h) = (Double(image.width), Double(image.height))
         return ReceiptParser.lines(from: boxes, aspect: sideways ? h / w : w / h)

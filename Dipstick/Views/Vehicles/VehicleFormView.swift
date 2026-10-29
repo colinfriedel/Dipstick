@@ -360,6 +360,9 @@ struct VehicleFormView: View {
 
         if vehicle == nil {
             modelContext.insert(target)
+            // A general schedule until the car's own is added from its manual.
+            target.loadSchedule(FactorySchedule.standard(forYear: target.year), into: modelContext)
+            target.scheduleSource = FactorySchedule.standardSource
         }
         modelContext.saveNow()
         dismiss()

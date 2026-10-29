@@ -54,7 +54,7 @@ nonisolated enum RecordReader {
         }
     }
 
-    private static func render(_ page: PDFPage) -> Data? {
+    static func render(_ page: PDFPage) -> Data? {
         #if canImport(UIKit)
         return page.thumbnail(of: CGSize(width: 2_000, height: 2_000), for: .mediaBox).jpegData(compressionQuality: 0.8)
         #else
@@ -62,6 +62,40 @@ nonisolated enum RecordReader {
         guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return nil }
         return rep.representation(using: .jpeg, properties: [.compressionFactor: 0.8])
         #endif
+    }
+
+    /// A page for the schedule reader: its text pieces with positions
+    /// (for grid tables), its text, and a picture.
+    static func schedulePage(fromImage data: Data) -> ScheduleReader.Page? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let orientation = (properties?[kCGImagePropertyOrientation] as? UInt32)
+            .flatMap(CGImagePropertyOrientation.init(rawValue:)) ?? .up
+        let textBoxes = ReceiptReader.recognizedBoxes(image, orientation: orientation)
+        let sideways = [.left, .right, .leftMirrored, .rightMirrored].contains(orientation)
+        let (w, h) = (Double(image.width), Double(image.height))
+        let lines = ReceiptParser.lines(from: textBoxes, aspect: sideways ? h / w : w / h)
+        return ScheduleReader.Page(boxes: ScheduleReader.boxes(from: textBoxes), text: lines.joined(separator: "\n"),
+                                   preview: PhotoStore.downsized(data, maxPixels: 2_400),
+                                   ink: ScheduleReader.InkMap(imageData: data))
+    }
+
+    /// PDF pages for the schedule reader, each rendered and read like a photo
+    /// (grids need positions), keeping the PDF's own text when it has some.
+    /// A whole owner's manual can be hundreds of pages, so only the pages
+    /// whose text looks like the maintenance schedule are read (see
+    /// `ScheduleReader.schedulePageIndexes`). A scanned PDF with no text is
+    /// read up to `ScheduleReader.maxScannedPages` pages.
+    static func schedulePages(fromPDF url: URL) -> [ScheduleReader.Page] {
+        guard let document = PDFDocument(url: url) else { return [] }
+        let texts = (0..<document.pageCount).map { document.page(at: $0)?.string ?? "" }
+        return ScheduleReader.schedulePageIndexes(texts).compactMap { index in
+            guard let page = document.page(at: index), let jpeg = render(page),
+                  var read = schedulePage(fromImage: jpeg) else { return nil }
+            if let text = page.string, text.trimmingCharacters(in: .whitespacesAndNewlines).count >= 40 { read.text = text }
+            return read
+        }
     }
 
     // MARK: Reading
