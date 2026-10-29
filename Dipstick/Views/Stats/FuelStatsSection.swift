@@ -58,8 +58,6 @@ struct FuelStatsSection: View {
             // Until drives are set up: right under the numbers they unlock.
             TripSetupCard(vehicle: vehicle, onSetUp: { isShowingSetup = true }, onLearnMore: { isShowingLearnMore = true })
                 .plainRow(top: 4, bottom: 6)
-                .sheet(isPresented: $isShowingSetup) { TripSetupView(vehicle: vehicle) }
-                .sheet(isPresented: $isShowingLearnMore) { TripsLearnMoreView() }
 
             if hasTrips, let current = vehicle.currentTankRecording {
                 CurrentTankBar(tank: current)
@@ -85,6 +83,10 @@ struct FuelStatsSection: View {
                     .buttonStyle(.borderless)
             }
             .plainRow(top: 14, bottom: 6)
+            // On a row that's always shown: the setup card goes away once
+            // drives are set up, and a sheet on it would go with it.
+            .sheet(isPresented: $isShowingSetup) { TripSetupView(vehicle: vehicle) }
+            .sheet(isPresented: $isShowingLearnMore) { TripsLearnMoreView() }
             // The sheets sit on this row, not the Section: a modifier on a
             // Section is copied onto every row.
             DrivesPanel(vehicle: vehicle, onShowAll: { isShowingTrips = true }) {

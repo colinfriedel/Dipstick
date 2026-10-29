@@ -313,8 +313,11 @@ struct ScheduleTextRow: View {
                         .font(.dipstick(12, relativeTo: .caption))
                         .foregroundStyle(Theme.muted)
                 }
-                if let progress, let due = progress.due.odometer {
-                    StatusLine(status: progress.status, text: "First due at \(due.formatted()) mi")
+                if let progress, progress.due.odometer != nil || progress.due.date != nil {
+                    let parts = [progress.due.odometer.map { "\($0.formatted()) mi" },
+                                 progress.due.date.map { $0.formatted(.dateTime.month(.abbreviated).year()) }]
+                        .compactMap { $0 }
+                    StatusLine(status: progress.status, text: "First due at \(parts.joined(separator: " or "))")
                         .padding(.top, 2)
                 }
             }

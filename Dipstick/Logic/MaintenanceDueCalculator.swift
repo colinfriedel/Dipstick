@@ -160,10 +160,13 @@ enum MaintenanceDueCalculator {
 extension Vehicle {
     /// Due status for each tracked service on this vehicle, most urgent first.
     func maintenanceDueItems(today: Date = Date()) -> [MaintenanceDueCalculator.Item<PersistentIdentifier>] {
+        // A service on the factory schedule follows the schedule's interval
+        // (yours, if you changed it), not the one saved when it was logged.
         let records = (maintenanceEntries ?? []).map {
             MaintenanceDueCalculator.Record(
                 id: $0.persistentModelID, serviceType: $0.serviceType,
-                date: $0.date, odometer: $0.odometer, due: $0.due
+                date: $0.date, odometer: $0.odometer,
+                due: scheduledDue(for: $0.serviceType, odometer: $0.odometer, date: $0.date) ?? $0.due
             )
         }
         return MaintenanceDueCalculator.items(for: records, currentOdometer: currentOdometer, today: today)

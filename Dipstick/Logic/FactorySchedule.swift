@@ -81,13 +81,14 @@ enum FactorySchedule {
     }
 
     /// Progress toward the next time this item is due. Never logged: counts
-    /// from 0 mi toward the first interval (or the regular one). Logged: counts
-    /// from the last time toward the regular interval. nil if the rule has no
-    /// interval at all.
+    /// from new (0 mi, and `inService` for time) toward the first interval,
+    /// or the regular one. Logged: counts from the last time toward the
+    /// regular interval. nil if the rule has no interval at all.
     static func progress(
         for rule: Rule,
         lastDone: LastDone?,
         currentOdometer: Int,
+        inService: Date? = nil,
         today: Date = Date(),
         calendar: Calendar = .current
     ) -> Progress? {
@@ -106,10 +107,17 @@ enum FactorySchedule {
                 let span = date.timeIntervalSince(lastDone.date)
                 fractions.append(today.timeIntervalSince(lastDone.date) / span)
             }
-        } else if let miles = rule.firstMiles ?? rule.everyMiles, miles > 0 {
-            // No start date is known for a never-logged item, so only miles count.
-            due.odometer = miles
-            fractions.append(Double(currentOdometer) / Double(miles))
+        } else {
+            if let miles = rule.firstMiles ?? rule.everyMiles, miles > 0 {
+                due.odometer = miles
+                fractions.append(Double(currentOdometer) / Double(miles))
+            }
+            // Time counts from when the car was new, when that's known.
+            if let inService, let months = rule.firstMonths ?? rule.everyMonths, months > 0,
+               let date = calendar.date(byAdding: .month, value: months, to: inService) {
+                due.date = date
+                fractions.append(today.timeIntervalSince(inService) / date.timeIntervalSince(inService))
+            }
         }
 
         let milesLeft = due.odometer.map { $0 - currentOdometer }
@@ -332,8 +340,33 @@ extension Vehicle {
             for: item.effectiveRule,
             lastDone: FactorySchedule.lastDone(item.serviceType, in: records),
             currentOdometer: currentOdometer,
+            inService: inServiceDate,
             today: today
         )
+    }
+
+    /// When the car was new, for time-based items never logged: January 1
+    /// of its model year (model years go on sale the fall before, so this
+    /// errs a little late rather than nagging early). nil without a year.
+    var inServiceDate: Date? {
+        year.flatMap { Calendar.current.date(from: DateComponents(year: $0, month: 1, day: 1)) }
+    }
+
+    /// The due point for a service logged at `odometer` on `date`, from this
+    /// car's schedule (your interval where set): the soonest of the
+    /// schedule items for that service. nil if none has a regular interval.
+    func scheduledDue(for serviceType: String, odometer: Int, date: Date) -> MaintenanceSchedule.Due? {
+        let rules = sortedScheduleItems
+            .filter { $0.serviceType.caseInsensitiveCompare(serviceType) == .orderedSame }
+            .map(\.effectiveRule)
+            .filter { $0.everyMiles != nil || $0.everyMonths != nil }
+        guard !rules.isEmpty else { return nil }
+        let dues = rules.map {
+            MaintenanceSchedule.nextDue(odometer: odometer, date: date,
+                                        every: .init(miles: $0.everyMiles, months: $0.everyMonths))
+        }
+        return MaintenanceSchedule.Due(odometer: dues.compactMap(\.odometer).min(),
+                                       date: dues.compactMap(\.date).min())
     }
 
     /// Adds a preset's items after any already on the schedule.
