@@ -28,7 +28,7 @@ struct DrivesPanel: View {
                     .padding(.vertical, 10)
             }
             if trips.isEmpty {
-                Text("No drives recorded yet. Set up automatic trips in Shortcuts, or record one here.")
+                Text("No drives yet. Once automatic drives are set up, they show here. You can also record one by hand.")
                     .font(.dipstick(13, relativeTo: .footnote))
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -466,50 +466,4 @@ struct TripRecordingView: View {
             .strokeBorder(Theme.panelBorder, style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
     }
     #endif
-}
-
-// MARK: - Location access
-
-/// Shown on the Stats tab until Dipstick has "Always" location access, which
-/// automatic trips need (they start with the app closed).
-struct LocationAccessNotice: View {
-    @Environment(TripRecorder.self) private var recorder
-    @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.openURL) private var openURL
-
-    var body: some View {
-        Group {
-            if !recorder.canRecordInBackground {
-                VStack(alignment: .leading, spacing: 8) {
-                    StatusLine(status: .dueSoon, text: "Automatic trips need location set to Always")
-                    Text(recorder.authorizationStatus == .notDetermined
-                         ? "Drives started by a Shortcuts automation run with Dipstick closed, so location access has to be Always. Only city and highway miles are saved, never your route."
-                         : "Open Settings › Dipstick › Location and choose Always. Only city and highway miles are saved, never your route.")
-                        .font(.dipstick(12, relativeTo: .caption))
-                        .foregroundStyle(Theme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button(recorder.authorizationStatus == .notDetermined || recorder.authorizationStatus == .authorizedWhenInUse
-                           && !triedAlways ? "Allow location" : "Open Settings") {
-                        if recorder.authorizationStatus == .notDetermined
-                            || (recorder.authorizationStatus == .authorizedWhenInUse && !triedAlways) {
-                            triedAlways = recorder.authorizationStatus == .authorizedWhenInUse
-                            recorder.requestAlwaysAuthorization()
-                        } else if let url = URL(string: UIApplication.openSettingsURLString) {
-                            openURL(url)
-                        }
-                    }
-                    .font(.dipstick(14, .semibold, relativeTo: .body))
-                    .foregroundStyle(Theme.accentText)
-                    .buttonStyle(.borderless)
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .panel(radius: Theme.Radius.field, border: Theme.amber.opacity(0.6))
-            }
-        }
-        .onChange(of: scenePhase) { if scenePhase == .active { recorder.refreshAuthorization() } }
-    }
-
-    /// iOS only shows the "Change to Always" prompt once; after that it's Settings.
-    @AppStorage("trips.askedForAlways") private var triedAlways = false
 }

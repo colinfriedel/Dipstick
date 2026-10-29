@@ -30,6 +30,8 @@ struct FuelStatsSection: View {
     @State private var range: Range = .all
     @State private var isShowingTrips = false
     @State private var isShowingRecorder = false
+    @State private var isShowingSetup = false
+    @State private var isShowingLearnMore = false
     @Environment(TripRecorder.self) private var recorder
 
     var body: some View {
@@ -53,6 +55,12 @@ struct FuelStatsSection: View {
                 .foregroundStyle(Theme.muted)
                 .plainRow(top: 4, bottom: 6)
 
+            // Until drives are set up: right under the numbers they unlock.
+            TripSetupCard(vehicle: vehicle, onSetUp: { isShowingSetup = true }, onLearnMore: { isShowingLearnMore = true })
+                .plainRow(top: 4, bottom: 6)
+                .sheet(isPresented: $isShowingSetup) { TripSetupView(vehicle: vehicle) }
+                .sheet(isPresented: $isShowingLearnMore) { TripsLearnMoreView() }
+
             if hasTrips, let current = vehicle.currentTankRecording {
                 CurrentTankBar(tank: current)
                     .plainRow(top: 6, bottom: 10)
@@ -71,13 +79,12 @@ struct FuelStatsSection: View {
             }
 
             SectionTitle("Drives") {
-                Text("For city and highway MPG")
-                    .font(.dipstick(11.5, relativeTo: .caption))
-                    .foregroundStyle(Theme.muted)
+                Button("How it works") { isShowingLearnMore = true }
+                    .font(.dipstick(12, .semibold, relativeTo: .caption))
+                    .foregroundStyle(Theme.accentText)
+                    .buttonStyle(.borderless)
             }
             .plainRow(top: 14, bottom: 6)
-            LocationAccessNotice()
-                .plainRow(top: 0, bottom: 8)
             // The sheets sit on this row, not the Section: a modifier on a
             // Section is copied onto every row.
             DrivesPanel(vehicle: vehicle, onShowAll: { isShowingTrips = true }) {
