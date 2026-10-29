@@ -23,6 +23,8 @@ struct VehicleFormView: View {
     @State private var colorHex: String?
     @State private var colorName: String
     @State private var customColor: Color
+    /// The hex code as typed, without the "#".
+    @State private var hexText: String
     @State private var showsTripDetection = false
     @State private var connectionMessage: String?
 
@@ -30,7 +32,7 @@ struct VehicleFormView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @FocusState private var odometerFocused: Bool
 
-    private enum Field { case name, year, make, model, vin, colorName }
+    private enum Field { case name, year, make, model, vin, colorName, hex }
 
     /// Preset chip colors: red, gold, silver, blue, green, black, white.
     static let swatches = ["#B8433F", "#D4AE48", "#A4A9B0", "#4A6FA5", "#3E7A55", "#1E2126", "#EEF0F2"]
@@ -46,6 +48,7 @@ struct VehicleFormView: View {
         _colorHex = State(initialValue: vehicle?.colorHex)
         _colorName = State(initialValue: vehicle?.colorName ?? "")
         _customColor = State(initialValue: vehicle?.colorHex.flatMap(Color.init(hexString:)) ?? Theme.accent)
+        _hexText = State(initialValue: String((vehicle?.colorHex ?? "").drop { $0 == "#" }))
     }
 
     private var isEditing: Bool { vehicle != nil }
@@ -128,8 +131,20 @@ struct VehicleFormView: View {
 
                 SmallCapsLabel("Color").padding(.top, 8)
                 swatchRow
-                textPanel("Color name · optional", text: $colorName, field: .colorName, placeholder: "e.g. Redondo Red Pearl")
-                    .textInputAutocapitalization(.words)
+                TileRow {
+                    hexPanel
+                        .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : 128)
+                    textPanel("Color name · optional", text: $colorName, field: .colorName, placeholder: "e.g. Redondo Red Pearl")
+                        .textInputAutocapitalization(.words)
+                }
+                if !hexIsValid {
+                    StatusLine(status: .overdue, text: "Use a 6-digit hex code, like B8433F")
+                } else if focused == .hex || colorHex == nil {
+                    Text("Look up your paint's hex code online (search your car's color name for an exact match, for example, \"Acura Redondo Red Pearl hex code\").")
+                        .font(.dipstick(11.5, relativeTo: .caption))
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 tripDetection.padding(.top, 4)
             }
@@ -196,6 +211,58 @@ struct VehicleFormView: View {
         .onTapGesture { focused = field }
     }
 
+    /// "#" and the hex code. A valid code sets the color as you type.
+    private var hexPanel: some View {
+        let isFocused = focused == .hex
+        return VStack(alignment: .leading, spacing: 3) {
+            SmallCapsLabel("Hex code")
+            HStack(spacing: 2) {
+                Text("#").foregroundStyle(Theme.muted)
+                TextField("Hex code", text: $hexText, prompt: Text("B8433F").foregroundStyle(Theme.faint))
+                    .foregroundStyle(Theme.text)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .keyboardType(.asciiCapable)
+                    .focused($focused, equals: .hex)
+                    .onChange(of: hexText) {
+                        // The "#" is already shown; drop one typed or pasted.
+                        if hexText.contains("#") {
+                            hexText = hexText.replacingOccurrences(of: "#", with: "")
+                            return
+                        }
+                        if let hex = Self.normalizedHex(hexText) {
+                            colorHex = hex
+                            if let color = Color(hexString: hex) { customColor = color }
+                        }
+                    }
+            }
+            .font(.readout(17, relativeTo: .body))
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+        .panel(radius: Theme.Radius.field,
+               border: !hexIsValid ? Theme.red : isFocused ? Theme.accent : Theme.panelBorder,
+               lineWidth: isFocused || !hexIsValid ? 1.5 : 1)
+        .contentShape(Rectangle())
+        .onTapGesture { focused = .hex }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var hexIsValid: Bool {
+        hexText.trimmingCharacters(in: .whitespaces).isEmpty || Self.normalizedHex(hexText) != nil
+    }
+
+    /// "#b8433f", "B8433F", "0xB8433F" or the short "B43" → "#B8433F"; nil
+    /// if it isn't a hex color.
+    static func normalizedHex(_ text: String) -> String? {
+        var digits = text.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if digits.hasPrefix("#") { digits.removeFirst() }
+        if digits.hasPrefix("0X") { digits.removeFirst(2) }
+        guard digits.allSatisfy(\.isHexDigit) else { return nil }
+        if digits.count == 3 { digits = digits.map { "\($0)\($0)" }.joined() }
+        return digits.count == 6 ? "#" + digits : nil
+    }
+
     private var swatchRow: some View {
         HStack(spacing: 6) {
             ForEach(Self.swatches, id: \.self) { hex in
@@ -219,7 +286,14 @@ struct VehicleFormView: View {
                 }
             }
             .accessibilityLabel("Custom color")
-            .onChange(of: customColor) { colorHex = customColor.hexString }
+            .onChange(of: customColor) {
+                // Typing a hex code sets the picker too; don't let it round the code.
+                if focused != .hex { colorHex = customColor.hexString }
+            }
+        }
+        // A swatch or the picker fills in the hex code.
+        .onChange(of: colorHex) {
+            if focused != .hex { hexText = String((colorHex ?? "").drop { $0 == "#" }) }
         }
     }
 

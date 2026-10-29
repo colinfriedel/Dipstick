@@ -39,3 +39,16 @@ struct ColorHexTests {
         }
     }
 }
+
+@MainActor
+struct HexCodeTests {
+    @Test func readsHexCodesAsPeopleTypeThem() {
+        #expect(VehicleFormView.normalizedHex("#b8433f") == "#B8433F")
+        #expect(VehicleFormView.normalizedHex(" B8433F ") == "#B8433F")
+        #expect(VehicleFormView.normalizedHex("0xB8433F") == "#B8433F")
+        #expect(VehicleFormView.normalizedHex("b43") == "#BB4433")
+        #expect(VehicleFormView.normalizedHex("B8433") == nil)
+        #expect(VehicleFormView.normalizedHex("GG0000") == nil)
+        #expect(VehicleFormView.normalizedHex("") == nil)
+    }
+}
