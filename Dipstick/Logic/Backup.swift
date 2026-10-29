@@ -23,6 +23,7 @@ nonisolated struct BackupData: Codable, Equatable {
         var year: Int?
         var make: String?
         var model: String?
+        var trim: String?
         var vin: String?
         var currentOdometer: Int
         var colorHex: String?
@@ -233,7 +234,7 @@ extension BackupSnapshot {
             .sorted { ($0.name, $0.currentOdometer) < ($1.name, $1.currentOdometer) }
         let cars = vehicles.map { v in
             BackupData.Car(
-                name: v.name, year: v.year, make: v.make, model: v.model, vin: v.vin,
+                name: v.name, year: v.year, make: v.make, model: v.model, trim: v.trim, vin: v.vin,
                 currentOdometer: v.currentOdometer, colorHex: v.colorHex, colorName: v.colorName,
                 knownConnections: v.knownConnections, connectionID: v.connectionID, connectionName: v.connectionName,
                 scheduleSource: v.scheduleSource,
@@ -332,6 +333,7 @@ enum BackupRestore {
         for car in data.vehicles {
             let v = Vehicle(name: car.name, year: car.year, make: car.make, model: car.model, vin: car.vin,
                             currentOdometer: car.currentOdometer)
+            v.trim = car.trim
             v.colorHex = car.colorHex
             v.colorName = car.colorName
             v.knownConnections = car.knownConnections

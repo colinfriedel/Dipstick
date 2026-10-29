@@ -18,6 +18,7 @@ struct VehicleFormView: View {
     @State private var year: String
     @State private var make: String
     @State private var model: String
+    @State private var trim: String
     @State private var vin: String
     @State private var odometer: String
     @State private var colorHex: String?
@@ -32,7 +33,7 @@ struct VehicleFormView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @FocusState private var odometerFocused: Bool
 
-    private enum Field { case name, year, make, model, vin, colorName, hex }
+    private enum Field { case name, year, make, model, trim, vin, colorName, hex }
 
     /// Preset chip colors: red, gold, silver, blue, green, black, white.
     static let swatches = ["#B8433F", "#D4AE48", "#A4A9B0", "#4A6FA5", "#3E7A55", "#1E2126", "#EEF0F2"]
@@ -43,6 +44,7 @@ struct VehicleFormView: View {
         _year = State(initialValue: vehicle?.year.map(String.init) ?? "")
         _make = State(initialValue: vehicle?.make ?? "")
         _model = State(initialValue: vehicle?.model ?? "")
+        _trim = State(initialValue: vehicle?.trim ?? "")
         _vin = State(initialValue: vehicle?.vin ?? "")
         _odometer = State(initialValue: vehicle.map { String($0.currentOdometer) } ?? "")
         _colorHex = State(initialValue: vehicle?.colorHex)
@@ -77,7 +79,7 @@ struct VehicleFormView: View {
     }
 
     private var previewModelLine: String {
-        [year, make, model].map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: " ")
+        [year, make, model, trim].map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: " ")
     }
 
     private var isCustomColor: Bool {
@@ -118,6 +120,8 @@ struct VehicleFormView: View {
                     StatusLine(status: .overdue, text: "Enter a year between \(String(Self.validYears.lowerBound)) and \(String(Self.validYears.upperBound))")
                 }
 
+                textPanel("Trim · optional", text: $trim, field: .trim, placeholder: "e.g. Base, Type S, EX, Si")
+                    .textInputAutocapitalization(.words)
                 textPanel("VIN · optional", text: $vin, field: .vin, mono: true, placeholder: "17 characters")
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
@@ -427,6 +431,7 @@ struct VehicleFormView: View {
         target.year = parsedYear
         target.make = nilIfBlank(make)
         target.model = nilIfBlank(model)
+        target.trim = nilIfBlank(trim)
         target.vin = nilIfBlank(vin)?.uppercased()
         target.currentOdometer = odometerValue
         target.colorHex = colorHex

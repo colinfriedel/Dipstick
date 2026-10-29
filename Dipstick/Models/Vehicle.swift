@@ -14,6 +14,8 @@ final class Vehicle {
     var year: Int?
     var make: String?
     var model: String?
+    /// Trim or sub-model: "Base", "Type S", "EX", "Si".
+    var trim: String?
     var vin: String?
     var currentOdometer: Int = 0
     /// Chip color as "#RRGGBB"; nil shows a neutral chip.
@@ -74,9 +76,10 @@ final class Vehicle {
         }
     }
 
-    /// "2014 Mazda Miata", built from whichever of year/make/model are set.
+    /// "2004 Acura RSX Type S", built from whichever of year, make, model
+    /// and trim are set.
     var yearMakeModel: String {
-        [year.map(String.init), make, model]
+        [year.map(String.init), make, model, trim]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
             .joined(separator: " ")

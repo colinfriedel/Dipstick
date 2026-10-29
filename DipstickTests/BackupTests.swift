@@ -22,6 +22,7 @@ struct BackupTests {
     /// One of everything the app stores.
     private func fill(_ context: ModelContext) {
         let car = Vehicle(name: "Acura RSX", year: 2004, make: "Acura", model: "RSX", vin: "JH4DC5", currentOdometer: 57_000)
+        car.trim = "Type S"
         car.colorHex = "#C0392B"
         car.colorName = "Red"
         car.knownConnections = "abc|Acura"
